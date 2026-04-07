@@ -85,40 +85,30 @@ curl -X POST http://localhost:5678/webhook/birads4b-discussion \
 
 ---
 
-## Resumen de desarrollo (conversación con Claude Code)
+## Resumen de desarrollo
 
-### Problema inicial
-El workflow tenía los **5 nodos de Ronda 2** con el `jsonBody` hardcodeado de la Ronda 1.  
-Esto causaba que cada especialista respondiera sin ver las opiniones de sus colegas — ignorando completamente el nodo **"Preparar Bodies R2"** que construye el historial multi-turno correcto.
+● Resumen del Proyecto: Discussion Medical Agents — BIRADS 4B
 
-Adicionalmente, el nodo **"Síntesis Final"** no tenía ningún body configurado.
+  Objetivo
 
-### Correcciones aplicadas
+  Workflow n8n que simula un comité tumoral multidisciplinario de mama para casos BIRADS 4B, ejecutado completamente de forma local con LiteLLM + Ollama.
 
-**Causa raíz:** `specifyBody: "json"` con `jsonBody` estático en vez de usar los bodies pre-construidos con `JSON.stringify` en el nodo Code previo.
+  ---
+  Arquitectura
 
-**Regla n8n+LiteLLM:** cuando el body del LLM se construye en un nodo Code con `JSON.stringify(...)`, el nodo HTTP Request debe usar `specifyBody: "string"` + `body: ={{ $json.body_xxx }}`. Usar `specifyBody: "json"` con `jsonBody` dinámico provoca doble-serialización o pérdida del historial.
+  5 agentes especialistas en 2 rondas de discusión + síntesis final:
 
-| Nodo corregido | Antes | Después |
-|---|---|---|
-| R2 - Radiologa | `jsonBody` R1 copiado | `body: ={{ $json.body_radiologo }}` |
-| R2 - Cirujano | `jsonBody` R1 copiado | `body: ={{ $json.body_cirujano }}` |
-| R2 - Oncologa | `jsonBody` R1 copiado | `body: ={{ $json.body_oncologo }}` |
-| R2 - Patologo | `jsonBody` R1 copiado | `body: ={{ $json.body_patologo }}` |
-| R2 - Ginecologa | `jsonBody` R1 copiado | `body: ={{ $json.body_ginecologo }}` |
-| Sintesis Final | sin body | `body: ={{ $json.body_sintesis }}` |
+  ┌──────────┬─────────────────────────────────────────────────────────────────────────────────────┐
+  │  Ronda   │                                      Dinámica                                       │
+  ├──────────┼─────────────────────────────────────────────────────────────────────────────────────┤
+  │ R1       │ Cada especialista evalúa el caso de forma independiente (paralelo)                  │
+  ├──────────┼─────────────────────────────────────────────────────────────────────────────────────┤
+  │ R2       │ Cada especialista debate con las opiniones de sus 4 colegas (historial multi-turno) │
+  ├──────────┼─────────────────────────────────────────────────────────────────────────────────────┤
+  │ Síntesis │ Director de comité consolida consenso y plan de acción                              │
+  └──────────┴─────────────────────────────────────────────────────────────────────────────────────┘
 
-### Flujo multi-turno correcto (Ronda 2)
 
-Cada llamada LLM en R2 incluye historial completo:
-```
-messages: [
-  { role: "system",    content: <perfil del especialista> },
-  { role: "user",      content: <pregunta R1 + caso clínico> },
-  { role: "assistant", content: <respuesta R1 del especialista> },
-  { role: "user",      content: <pregunta R2 con contexto de colegas> }
-]
-```
 
 ### Nota sobre /no_think
 El modelo `qwen3.5:9b-local` (Oncóloga) recibe el prefijo `/no_think` tanto en el system prompt como en el user message de R1 y R2, para suprimir el bloque `<think>` interno y obtener respuestas directas.
