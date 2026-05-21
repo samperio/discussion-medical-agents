@@ -1,0 +1,301 @@
+{
+  "name": "Red Multi-Agente (Personajes Separados) + Descarga MD",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "discusion",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "79a12db8-be97-460a-b416-be0c88c6bc52",
+      "name": "Iniciar Discusión",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-704, 320],
+      "webhookId": "discusion-multiagente"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nreturn [{\n  json: {\n    topic: body.topic || '¿Debemos expandirnos a Brasil este año o fortalecer primero los mercados actuales?',\n    history: [],\n    history_summary: null,\n    round: 1,\n    total_rounds: parseInt(body.total_rounds) || 3\n  }\n}];"
+      },
+      "id": "7f0974d9-eba8-46ff-974e-3ec2e9f173d8",
+      "name": "Definir Tema",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-512, 320]
+    },
+    {
+      "parameters": {
+        "jsCode": "const state = $input.first().json;\nconst nombre = 'Sofía Ramírez — CEO';\nconst rol = 'Visión estratégica y liderazgo';\nconst system_prompt = 'Eres Sofía Ramírez, CEO de una empresa de tecnología en crecimiento. Tu forma de pensar es siempre desde la visión de largo plazo. Escuchas a todos pero siempre rediriges la conversación hacia el impacto en el negocio: crecimiento y sostenibilidad. Eres directa y terminas con una pregunta para el grupo.';\nconst knowledge = 'Operamos en MX, CO y AR. Revenue: $8M. Objetivo: $15M en 2 años. Oportunidad en Brasil requiere inversión fuerte. Inversionistas abiertos a Serie B si hay estrategia clara.';\n\nlet historyText;\nif (state.history_summary) {\n  const currentRoundHistory = state.history\n    .filter(h => h.round === state.round)\n    .map(h => `[${h.nombre}]: ${h.response}`)\n    .join('\\n\\n---\\n\\n');\n  historyText = `[Resumen rondas anteriores]:\\n${state.history_summary}` +\n    (currentRoundHistory ? `\\n\\n[Esta ronda]:\\n${currentRoundHistory}` : '');\n} else if (state.history.length > 0) {\n  historyText = state.history.map(h => `[${h.nombre} - Ronda ${h.round}]:\\n${h.response}`).join('\\n\\n---\\n\\n');\n} else {\n  historyText = '(Eres la primera en hablar)';\n}\n\nconst msg = `Contexto:\\n${knowledge}\\n\\nTEMA: \"${state.topic}\"\\nRonda: ${state.round} de ${state.total_rounds}\\n\\nHistorial:\\n${historyText}\\n\\nResponde como CEO. Máximo 130 palabras.`;\n\nconst options = {\n  method: 'POST',\n  url: 'http://localhost:11434/api/chat',\n  headers: { 'Content-Type': 'application/json' },\n  body: { model: 'qwen3:14b', stream: false, messages:[{ role: 'system', content: system_prompt }, { role: 'user', content: msg }] },\n  json: true\n};\n\nlet res;\ntry {\n  res = await this.helpers.httpRequest(options);\n  state.history.push({ round: state.round, nombre, rol, response: res.message.content });\n} catch(e) {\n  state.history.push({ round: state.round, nombre, rol, response: `[ERROR ${nombre}: ${e.message}]` });\n}\nreturn [{ json: state }];"
+      },
+      "id": "d2891c05-1a36-4bed-882e-5387430d8b36",
+      "name": "CEO — Sofía",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-256, 128]
+    },
+    {
+      "parameters": {
+        "jsCode": "const state = $input.first().json;\nconst nombre = 'Andrés Morales — CTO';\nconst rol = 'Arquitectura y viabilidad técnica';\nconst system_prompt = 'Eres Andrés Morales, CTO. Eres analítico y tiendes a ver los riesgos técnicos. Aportas la perspectiva de viabilidad. Defiendes la calidad del código y la infraestructura.';\nconst knowledge = 'Arquitectura monolítica. Deuda técnica de 14 meses. Expandir a Brasil requeriría construir soporte multimoneda y traducción, estimado en 8 meses mínimo de trabajo.';\n\nlet historyText;\nif (state.history_summary) {\n  const currentRoundHistory = state.history\n    .filter(h => h.round === state.round)\n    .map(h => `[${h.nombre}]: ${h.response}`)\n    .join('\\n\\n---\\n\\n');\n  historyText = `[Resumen rondas anteriores]:\\n${state.history_summary}` +\n    (currentRoundHistory ? `\\n\\n[Esta ronda]:\\n${currentRoundHistory}` : '');\n} else {\n  historyText = state.history.map(h => `[${h.nombre} - Ronda ${h.round}]:\\n${h.response}`).join('\\n\\n---\\n\\n');\n}\n\nconst msg = `Contexto:\\n${knowledge}\\n\\nTEMA: \"${state.topic}\"\\nRonda: ${state.round} de ${state.total_rounds}\\n\\nHistorial:\\n${historyText}\\n\\nResponde como CTO. Máximo 130 palabras.`;\n\nconst options = {\n  method: 'POST',\n  url: 'http://localhost:11434/api/chat',\n  headers: { 'Content-Type': 'application/json' },\n  body: { model: 'qwen3.5:9b', stream: false, messages:[{ role: 'system', content: system_prompt }, { role: 'user', content: msg }] },\n  json: true\n};\n\nlet res;\ntry {\n  res = await this.helpers.httpRequest(options);\n  state.history.push({ round: state.round, nombre, rol, response: res.message.content });\n} catch(e) {\n  state.history.push({ round: state.round, nombre, rol, response: `[ERROR ${nombre}: ${e.message}]` });\n}\nreturn [{ json: state }];"
+      },
+      "id": "bcebd8e4-ea25-4d6a-8353-600c097c907e",
+      "name": "CTO — Andrés",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const state = $input.first().json;\nconst nombre = 'Laura Vega — CFO';\nconst rol = 'Salud financiera';\nconst system_prompt = 'Eres Laura Vega, CFO. La voz de la prudencia. Exiges modelo financiero claro: cuánto cuesta y riesgos. Cuidas el flujo de caja.';\nconst knowledge = '14 meses de runway. Burn rate de $520k/mes. CAC aumentó 34%. Expandir a Brasil requeriría $1.2M - $1.8M USD. Tenemos crédito de $2M disponible.';\n\nlet historyText;\nif (state.history_summary) {\n  const currentRoundHistory = state.history\n    .filter(h => h.round === state.round)\n    .map(h => `[${h.nombre}]: ${h.response}`)\n    .join('\\n\\n---\\n\\n');\n  historyText = `[Resumen rondas anteriores]:\\n${state.history_summary}` +\n    (currentRoundHistory ? `\\n\\n[Esta ronda]:\\n${currentRoundHistory}` : '');\n} else {\n  historyText = state.history.map(h => `[${h.nombre} - Ronda ${h.round}]:\\n${h.response}`).join('\\n\\n---\\n\\n');\n}\n\nconst msg = `Contexto:\\n${knowledge}\\n\\nTEMA: \"${state.topic}\"\\nRonda: ${state.round} de ${state.total_rounds}\\n\\nHistorial:\\n${historyText}\\n\\nResponde como CFO. Máximo 130 palabras.`;\n\nconst options = {\n  method: 'POST',\n  url: 'http://localhost:11434/api/chat',\n  headers: { 'Content-Type': 'application/json' },\n  body: { model: 'llama3.1:8b', stream: false, messages:[{ role: 'system', content: system_prompt }, { role: 'user', content: msg }] },\n  json: true\n};\n\nlet res;\ntry {\n  res = await this.helpers.httpRequest(options);\n  state.history.push({ round: state.round, nombre, rol, response: res.message.content });\n} catch(e) {\n  state.history.push({ round: state.round, nombre, rol, response: `[ERROR ${nombre}: ${e.message}]` });\n}\nreturn [{ json: state }];"
+      },
+      "id": "ef47d731-4b9e-4613-9627-6965dd14710a",
+      "name": "CFO — Laura",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [272, 128]
+    },
+    {
+      "parameters": {
+        "jsCode": "const state = $input.first().json;\nconst nombre = 'Miguel Torres — CPO';\nconst rol = 'Producto y UX';\nconst system_prompt = 'Eres Miguel Torres, CPO. Traes la voz del usuario. Crees que el motor de crecimiento es un buen producto. Defiendes hacer pocas cosas muy bien.';\nconst knowledge = 'Churn alto por complejidad (38%) y falta de integraciones (27%). NPS en 34 (benchmark 40). Clientes Enterprise cancelan por falta de customización.';\n\nlet historyText;\nif (state.history_summary) {\n  const currentRoundHistory = state.history\n    .filter(h => h.round === state.round)\n    .map(h => `[${h.nombre}]: ${h.response}`)\n    .join('\\n\\n---\\n\\n');\n  historyText = `[Resumen rondas anteriores]:\\n${state.history_summary}` +\n    (currentRoundHistory ? `\\n\\n[Esta ronda]:\\n${currentRoundHistory}` : '');\n} else {\n  historyText = state.history.map(h => `[${h.nombre} - Ronda ${h.round}]:\\n${h.response}`).join('\\n\\n---\\n\\n');\n}\n\nconst msg = `Contexto:\\n${knowledge}\\n\\nTEMA: \"${state.topic}\"\\nRonda: ${state.round} de ${state.total_rounds}\\n\\nHistorial:\\n${historyText}\\n\\nResponde como CPO. Máximo 130 palabras.`;\n\nconst options = {\n  method: 'POST',\n  url: 'http://localhost:11434/api/chat',\n  headers: { 'Content-Type': 'application/json' },\n  body: { model: 'lfm2.5-thinking:latest', stream: false, messages:[{ role: 'system', content: system_prompt }, { role: 'user', content: msg }] },\n  json: true\n};\n\nlet res;\ntry {\n  res = await this.helpers.httpRequest(options);\n  state.history.push({ round: state.round, nombre, rol, response: res.message.content });\n} catch(e) {\n  state.history.push({ round: state.round, nombre, rol, response: `[ERROR ${nombre}: ${e.message}]` });\n}\nreturn [{ json: state }];"
+      },
+      "id": "a4901b9e-623a-4aa0-b6f3-a877939a70ba",
+      "name": "CPO — Miguel",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-240, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "const state = $input.first().json;\nconst nombre = 'Valentina Cruz — CMO';\nconst rol = 'Posicionamiento y adquisición';\nconst system_prompt = 'Eres Valentina Cruz, CMO. Orientada a métricas (CAC). Tu visión parte del mercado: cómo nos perciben. Piensas rápido en competencia.';\nconst knowledge = '41% de clientes son referidos. 28% SEO. En Brasil somos desconocidos. Competidor multinacional lanzó campaña en español. Oportunidad de ser la alternativa local.';\n\nlet historyText;\nif (state.history_summary) {\n  const currentRoundHistory = state.history\n    .filter(h => h.round === state.round)\n    .map(h => `[${h.nombre}]: ${h.response}`)\n    .join('\\n\\n---\\n\\n');\n  historyText = `[Resumen rondas anteriores]:\\n${state.history_summary}` +\n    (currentRoundHistory ? `\\n\\n[Esta ronda]:\\n${currentRoundHistory}` : '');\n} else {\n  historyText = state.history.map(h => `[${h.nombre} - Ronda ${h.round}]:\\n${h.response}`).join('\\n\\n---\\n\\n');\n}\n\nconst msg = `Contexto:\\n${knowledge}\\n\\nTEMA: \"${state.topic}\"\\nRonda: ${state.round} de ${state.total_rounds}\\n\\nHistorial:\\n${historyText}\\n\\nResponde como CMO. Máximo 130 palabras.`;\n\nconst options = {\n  method: 'POST',\n  url: 'http://localhost:11434/api/chat',\n  headers: { 'Content-Type': 'application/json' },\n  body: { model: 'llama3.2:latest', stream: false, messages:[{ role: 'system', content: system_prompt }, { role: 'user', content: msg }] },\n  json: true\n};\n\nlet res;\ntry {\n  res = await this.helpers.httpRequest(options);\n  state.history.push({ round: state.round, nombre, rol, response: res.message.content });\n} catch(e) {\n  state.history.push({ round: state.round, nombre, rol, response: `[ERROR ${nombre}: ${e.message}]` });\n}\nreturn [{ json: state }];"
+      },
+      "id": "a0917c41-0b0c-438c-a9d2-482b77266d98",
+      "name": "CMO — Valentina",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [16, 512]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ parseInt($json.round) }}",
+              "value2": "={{ parseInt($json.total_rounds) }}"
+            }
+          ]
+        }
+      },
+      "id": "388d37aa-2197-4e82-ad42-9828629fe3d9",
+      "name": "¿Ronda < 3?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [272, 384]
+    },
+    {
+      "parameters": {
+        "jsCode": "const state = $input.first().json;\nstate.round += 1;\nreturn [{ json: state }];"
+      },
+      "id": "f8063a45-bb42-46d5-ad3d-0bbcf1bae3c7",
+      "name": "Sumar +1 Ronda",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [432, 512]
+    },
+    {
+      "parameters": {
+        "jsCode": "const state = $input.first().json;\n\nif (state.history.length === 0) return [{ json: state }];\n\nconst historialCompleto = state.history\n  .map(h => `[${h.nombre} - Ronda ${h.round}]: ${h.response}`)\n  .join('\\n\\n');\n\nconst options = {\n  method: 'POST',\n  url: 'http://localhost:11434/api/chat',\n  headers: { 'Content-Type': 'application/json' },\n  body: {\n    model: 'llama3.2:latest',\n    stream: false,\n    messages: [\n      { role: 'system', content: 'Eres un asistente que resume discusiones ejecutivas. Sé conciso y captura los puntos clave.' },\n      { role: 'user', content: `Resume en máximo 5 bullets los puntos clave de esta discusión:\\n\\n${historialCompleto}` }\n    ]\n  },\n  json: true\n};\n\ntry {\n  const res = await this.helpers.httpRequest(options);\n  state.history_summary = res.message.content;\n} catch(e) {\n  state.history_summary = null;\n}\n\nreturn [{ json: state }];"
+      },
+      "id": "c1a2b3c4-d5e6-7890-abcd-ef1234567890",
+      "name": "Comprimir Historia",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [432, 640]
+    },
+    {
+      "parameters": {
+        "jsCode": "const state = $input.first().json;\nconst fullDiscussion = state.history.map(h => `[${h.nombre} - Ronda ${h.round}]:\\n${h.response}`).join('\\n\\n');\n\nconst msg = `Tema: \"${state.topic}\"\\n\\nDiscusión:\\n${fullDiscussion}\\n\\n---\\nEscribe una SÍNTESIS EJECUTIVA (Markdown) con:\\n1. Consensos\\n2. Tensiones y Riesgos\\n3. Decisiones y Próximos pasos (30 días)`;\n\nconst options = {\n  method: 'POST',\n  url: 'http://localhost:11434/api/chat',\n  headers: { 'Content-Type': 'application/json' },\n  body: { model: 'qwen3:14b', stream: false, messages:[{ role: 'system', content: 'Eres analista estratégico experto en sintetizar discusiones ejecutivas.' }, { role: 'user', content: msg }] },\n  json: true\n};\n\nlet res;\ntry {\n  res = await this.helpers.httpRequest(options);\n  state.sintesis = res.message.content;\n} catch(e) {\n  state.sintesis = `[ERROR al generar síntesis: ${e.message}]`;\n}\nreturn [{ json: state }];"
+      },
+      "id": "0fde82ea-609c-4ee4-afab-fbe64bc3d5b7",
+      "name": "Generar Síntesis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [496, 320]
+    },
+    {
+      "parameters": {
+        "jsCode": "const state = $input.first().json;\nconst timestamp = new Date().toISOString().slice(0, 10);\nconst fileName = `Reporte_${timestamp}_${Date.now()}.md`;\n\nlet md = `# DISCUSIÓN ESTRATÉGICA\n**Tema:** ${state.topic}\n**Fecha:** ${new Date().toLocaleDateString()}\n\n---\n\n## SÍNTESIS EJECUTIVA\n${state.sintesis}\n\n---\n\n## TRANSCRIPCIÓN COMPLETA DE LA SESIÓN\n`;\n\nfor(const h of state.history) {\n  md += `### ${h.nombre} (Ronda ${h.round})\n> ${h.response}\n\n`;\n}\n\nreturn [{\n  json: { status: 'Completado', topic: state.topic, fileName },\n  binary: {\n    'Reporte_Estrategia': {\n      data: Buffer.from(md, 'utf8').toString('base64'),\n      mimeType: 'text/markdown',\n      fileName: fileName,\n      fileExtension: 'md'\n    }\n  }\n}];"
+      },
+      "id": "4d357369-4e50-426f-89a0-a4f3f6cd9232",
+      "name": "Generar Archivo .MD",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [704, 320]
+    },
+    {
+      "parameters": {
+        "fileName": "=C:/Samperio/Claude/agents-discution/reportes/{{ $binary['Reporte_Estrategia'].fileName }}",
+        "dataPropertyName": "Reporte_Estrategia",
+        "options": {}
+      },
+      "id": "g1a2b3c4-d5e6-7890-abcd-ef1234567890",
+      "name": "Guardar Archivo",
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "typeVersion": 1,
+      "position": [912, 320]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Iniciar Discusión": {
+      "main": [
+        [
+          {
+            "node": "Definir Tema",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Definir Tema": {
+      "main": [
+        [
+          {
+            "node": "CEO — Sofía",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CEO — Sofía": {
+      "main": [
+        [
+          {
+            "node": "CTO — Andrés",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CTO — Andrés": {
+      "main": [
+        [
+          {
+            "node": "CFO — Laura",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CFO — Laura": {
+      "main": [
+        [
+          {
+            "node": "CPO — Miguel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CPO — Miguel": {
+      "main": [
+        [
+          {
+            "node": "CMO — Valentina",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CMO — Valentina": {
+      "main": [
+        [
+          {
+            "node": "¿Ronda < 3?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Ronda < 3?": {
+      "main": [
+        [
+          {
+            "node": "Sumar +1 Ronda",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generar Síntesis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sumar +1 Ronda": {
+      "main": [
+        [
+          {
+            "node": "Comprimir Historia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comprimir Historia": {
+      "main": [
+        [
+          {
+            "node": "CEO — Sofía",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generar Síntesis": {
+      "main": [
+        [
+          {
+            "node": "Generar Archivo .MD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generar Archivo .MD": {
+      "main": [
+        [
+          {
+            "node": "Guardar Archivo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "755190c3-f44e-4cd9-9f0a-a6585bdb5acf",
+  "meta": {
+    "instanceId": "d875ae845499579163d494e2ac7c7af243f9e8569169057b531543fe51f549c7"
+  },
+  "id": "zd7xvkDHphEvxeCD",
+  "tags": []
+}

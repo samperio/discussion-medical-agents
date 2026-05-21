@@ -1,0 +1,5 @@
+# Expedientes clínicos y datos de pacientes
+*.pdf
+
+# Backups
+*.bk

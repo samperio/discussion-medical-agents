@@ -1,0 +1,146 @@
+<svg viewBox="0 0 900 580" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Arial, sans-serif">
+
+  <!-- Background -->
+  <rect width="900" height="580" fill="#0f1117"/>
+
+  <!-- Title -->
+  <text x="450" y="38" text-anchor="middle" fill="#ffffff" font-size="18" font-weight="700" letter-spacing="1">Multi-Agent Discussion Framework</text>
+  <text x="450" y="58" text-anchor="middle" fill="#6b7280" font-size="12">n8n · LiteLLM Proxy · Ollama (local)</text>
+
+  <!-- ── INPUT ── -->
+  <rect x="370" y="75" width="160" height="44" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="450" y="93" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="600">INPUT</text>
+  <text x="450" y="109" text-anchor="middle" fill="#64748b" font-size="10">Case / Problem</text>
+
+  <!-- arrow down -->
+  <line x1="450" y1="119" x2="450" y2="138" stroke="#374151" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- PRE-VALIDATION -->
+  <rect x="370" y="138" width="160" height="44" rx="8" fill="#1e293b" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="450" y="156" text-anchor="middle" fill="#a5b4fc" font-size="11" font-weight="600">PRE-VALIDATION</text>
+  <text x="450" y="172" text-anchor="middle" fill="#64748b" font-size="10">gemma3:270m</text>
+
+  <!-- arrow down to R1 -->
+  <line x1="450" y1="182" x2="450" y2="200" stroke="#374151" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ROUND 1 label -->
+  <text x="450" y="218" text-anchor="middle" fill="#f59e0b" font-size="12" font-weight="700" letter-spacing="2">ROUND 1 — Independent Analysis</text>
+
+  <!-- Round 1 agents -->
+  <!-- Agent 1 -->
+  <rect x="30" y="228" width="148" height="52" rx="7" fill="#1e293b" stroke="#f59e0b" stroke-width="1.2"/>
+  <text x="104" y="247" text-anchor="middle" fill="#fcd34d" font-size="10" font-weight="600">Radiologist</text>
+  <text x="104" y="262" text-anchor="middle" fill="#64748b" font-size="9">qwen3:14b</text>
+  <text x="104" y="275" text-anchor="middle" fill="#374151" font-size="8">moderator role</text>
+
+  <!-- Agent 2 -->
+  <rect x="192" y="228" width="148" height="52" rx="7" fill="#1e293b" stroke="#f59e0b" stroke-width="1.2"/>
+  <text x="266" y="247" text-anchor="middle" fill="#fcd34d" font-size="10" font-weight="600">Surgeon</text>
+  <text x="266" y="262" text-anchor="middle" fill="#64748b" font-size="9">llama3.1:8b</text>
+  <text x="266" y="275" text-anchor="middle" fill="#374151" font-size="8">surgical perspective</text>
+
+  <!-- Agent 3 -->
+  <rect x="354" y="228" width="148" height="52" rx="7" fill="#1e293b" stroke="#f59e0b" stroke-width="1.2"/>
+  <text x="428" y="247" text-anchor="middle" fill="#fcd34d" font-size="10" font-weight="600">Oncologist</text>
+  <text x="428" y="262" text-anchor="middle" fill="#64748b" font-size="9">qwen3.5:9b</text>
+  <text x="428" y="275" text-anchor="middle" fill="#374151" font-size="8">treatment view</text>
+
+  <!-- Agent 4 -->
+  <rect x="516" y="228" width="148" height="52" rx="7" fill="#1e293b" stroke="#f59e0b" stroke-width="1.2"/>
+  <text x="590" y="247" text-anchor="middle" fill="#fcd34d" font-size="10" font-weight="600">Pathologist</text>
+  <text x="590" y="262" text-anchor="middle" fill="#64748b" font-size="9">lfm2.5-instruct</text>
+  <text x="590" y="275" text-anchor="middle" fill="#374151" font-size="8">tissue analysis</text>
+
+  <!-- Agent 5 -->
+  <rect x="678" y="228" width="148" height="52" rx="7" fill="#1e293b" stroke="#f59e0b" stroke-width="1.2"/>
+  <text x="752" y="247" text-anchor="middle" fill="#fcd34d" font-size="10" font-weight="600">Mastologist</text>
+  <text x="752" y="262" text-anchor="middle" fill="#64748b" font-size="9">llama3.2</text>
+  <text x="752" y="275" text-anchor="middle" fill="#374151" font-size="8">specialist view</text>
+
+  <!-- lines from pre-val to agents R1 -->
+  <line x1="440" y1="200" x2="104" y2="228" stroke="#374151" stroke-width="1" stroke-dasharray="4,3"/>
+  <line x1="445" y1="200" x2="266" y2="228" stroke="#374151" stroke-width="1" stroke-dasharray="4,3"/>
+  <line x1="450" y1="200" x2="428" y2="228" stroke="#374151" stroke-width="1" stroke-dasharray="4,3"/>
+  <line x1="455" y1="200" x2="590" y2="228" stroke="#374151" stroke-width="1" stroke-dasharray="4,3"/>
+  <line x1="460" y1="200" x2="752" y2="228" stroke="#374151" stroke-width="1" stroke-dasharray="4,3"/>
+
+  <!-- MERGE R1 -->
+  <line x1="104" y1="280" x2="104" y2="298" stroke="#374151" stroke-width="1"/>
+  <line x1="266" y1="280" x2="266" y2="298" stroke="#374151" stroke-width="1"/>
+  <line x1="428" y1="280" x2="428" y2="298" stroke="#374151" stroke-width="1"/>
+  <line x1="590" y1="280" x2="590" y2="298" stroke="#374151" stroke-width="1"/>
+  <line x1="752" y1="280" x2="752" y2="298" stroke="#374151" stroke-width="1"/>
+  <line x1="104" y1="298" x2="752" y2="298" stroke="#374151" stroke-width="1"/>
+  <line x1="428" y1="298" x2="428" y2="312" stroke="#374151" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ROUND 2 label -->
+  <text x="450" y="330" text-anchor="middle" fill="#34d399" font-size="12" font-weight="700" letter-spacing="2">ROUND 2 — Cross-Agent Debate</text>
+
+  <!-- Round 2 agents -->
+  <rect x="30" y="340" width="148" height="52" rx="7" fill="#1e293b" stroke="#34d399" stroke-width="1.2"/>
+  <text x="104" y="358" text-anchor="middle" fill="#6ee7b7" font-size="10" font-weight="600">Radiologist</text>
+  <text x="104" y="373" text-anchor="middle" fill="#64748b" font-size="9">reads R1 context</text>
+  <text x="104" y="386" text-anchor="middle" fill="#374151" font-size="8">agrees / challenges</text>
+
+  <rect x="192" y="340" width="148" height="52" rx="7" fill="#1e293b" stroke="#34d399" stroke-width="1.2"/>
+  <text x="266" y="358" text-anchor="middle" fill="#6ee7b7" font-size="10" font-weight="600">Surgeon</text>
+  <text x="266" y="373" text-anchor="middle" fill="#64748b" font-size="9">reads R1 context</text>
+  <text x="266" y="386" text-anchor="middle" fill="#374151" font-size="8">agrees / challenges</text>
+
+  <rect x="354" y="340" width="148" height="52" rx="7" fill="#1e293b" stroke="#34d399" stroke-width="1.2"/>
+  <text x="428" y="358" text-anchor="middle" fill="#6ee7b7" font-size="10" font-weight="600">Oncologist</text>
+  <text x="428" y="373" text-anchor="middle" fill="#64748b" font-size="9">reads R1 context</text>
+  <text x="428" y="386" text-anchor="middle" fill="#374151" font-size="8">agrees / challenges</text>
+
+  <rect x="516" y="340" width="148" height="52" rx="7" fill="#1e293b" stroke="#34d399" stroke-width="1.2"/>
+  <text x="590" y="358" text-anchor="middle" fill="#6ee7b7" font-size="10" font-weight="600">Pathologist</text>
+  <text x="590" y="373" text-anchor="middle" fill="#64748b" font-size="9">reads R1 context</text>
+  <text x="590" y="386" text-anchor="middle" fill="#374151" font-size="8">agrees / challenges</text>
+
+  <rect x="678" y="340" width="148" height="52" rx="7" fill="#1e293b" stroke="#34d399" stroke-width="1.2"/>
+  <text x="752" y="358" text-anchor="middle" fill="#6ee7b7" font-size="10" font-weight="600">Mastologist</text>
+  <text x="752" y="373" text-anchor="middle" fill="#64748b" font-size="9">reads R1 context</text>
+  <text x="752" y="386" text-anchor="middle" fill="#374151" font-size="8">agrees / challenges</text>
+
+  <!-- lines R1 merge to R2 agents -->
+  <line x1="428" y1="312" x2="104" y2="340" stroke="#374151" stroke-width="1" stroke-dasharray="4,3"/>
+  <line x1="430" y1="312" x2="266" y2="340" stroke="#374151" stroke-width="1" stroke-dasharray="4,3"/>
+  <line x1="432" y1="312" x2="428" y2="340" stroke="#374151" stroke-width="1" stroke-dasharray="4,3"/>
+  <line x1="434" y1="312" x2="590" y2="340" stroke="#374151" stroke-width="1" stroke-dasharray="4,3"/>
+  <line x1="436" y1="312" x2="752" y2="340" stroke="#374151" stroke-width="1" stroke-dasharray="4,3"/>
+
+  <!-- MERGE R2 -->
+  <line x1="104" y1="392" x2="104" y2="410" stroke="#374151" stroke-width="1"/>
+  <line x1="266" y1="392" x2="266" y2="410" stroke="#374151" stroke-width="1"/>
+  <line x1="428" y1="392" x2="428" y2="410" stroke="#374151" stroke-width="1"/>
+  <line x1="590" y1="392" x2="590" y2="410" stroke="#374151" stroke-width="1"/>
+  <line x1="752" y1="392" x2="752" y2="410" stroke="#374151" stroke-width="1"/>
+  <line x1="104" y1="410" x2="752" y2="410" stroke="#374151" stroke-width="1"/>
+  <line x1="428" y1="410" x2="428" y2="424" stroke="#374151" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- SYNTHESIS -->
+  <rect x="320" y="424" width="260" height="52" rx="8" fill="#1e293b" stroke="#e879f9" stroke-width="1.8"/>
+  <text x="450" y="444" text-anchor="middle" fill="#f0abfc" font-size="12" font-weight="700">SYNTHESIS</text>
+  <text x="450" y="460" text-anchor="middle" fill="#64748b" font-size="10">lfm2.5-thinking (reasoning model)</text>
+  <text x="450" y="473" text-anchor="middle" fill="#374151" font-size="9">structured report · convergence · open points</text>
+
+  <!-- arrow to output -->
+  <line x1="450" y1="476" x2="450" y2="494" stroke="#374151" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- OUTPUT -->
+  <rect x="370" y="494" width="160" height="40" rx="8" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="450" y="512" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="600">REPORT</text>
+  <text x="450" y="527" text-anchor="middle" fill="#64748b" font-size="9">Webhook Response</text>
+
+  <!-- LiteLLM proxy banner -->
+  <rect x="20" y="546" width="860" height="24" rx="5" fill="#1e293b" stroke="#4b5563" stroke-width="1"/>
+  <text x="450" y="562" text-anchor="middle" fill="#9ca3af" font-size="10">LiteLLM Proxy — unified routing · model swap without workflow changes · all models local via Ollama</text>
+
+  <!-- Arrow marker -->
+  <defs>
+    <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#4b5563"/>
+    </marker>
+  </defs>
+
+</svg>

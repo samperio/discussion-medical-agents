@@ -1,0 +1,726 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "birads4b-discussion",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "326d9e56-7589-480f-b3a2-2a814f31fc89",
+      "name": "Webhook - Caso Clinico",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -464,
+        272
+      ],
+      "webhookId": "birads4b-webhook-001"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "caso-clinico",
+              "name": "caso_clinico",
+              "value": "={{ $json.body.caso_clinico ?? 'Paciente femenina de 49 años. Mamografía de tamizaje detecta lesión espiculada de 1.2cm en cuadrante superior externo de mama derecha. Ecografía muestra nódulo hipoecogénico con sombra acústica posterior, márgenes irregulares. Sin adenopatías axilares palpables. Antecedente familiar: madre con cáncer de mama a los 52 años. Categoría BIRADS 4B.' }}",
+              "type": "string"
+            },
+            {
+              "id": "paciente-nombre",
+              "name": "paciente_nombre",
+              "value": "={{ $json.body.paciente_nombre ?? 'Paciente Anónima' }}",
+              "type": "string"
+            },
+            {
+              "id": "api-key",
+              "name": "anthropic_api_key",
+              "value": "={{ $json.body.api_key ?? $env.ANTHROPIC_API_KEY }}",
+              "type": "string"
+            },
+            {
+              "id": "modelo-debate",
+              "name": "modelo_debate",
+              "value": "claude-sonnet-4-6",
+              "type": "string"
+            },
+            {
+              "id": "modelo-sintesis",
+              "name": "modelo_sintesis",
+              "value": "claude-opus-4-6",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ac6b6032-c1d8-4ed6-a6ae-4d57e852cbf8",
+      "name": "Configurar Caso Clinico",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -240,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $('Configurar Caso Clinico').item.json.anthropic_api_key }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"{{ $('Configurar Caso Clinico').item.json.modelo_debate }}\",\n  \"max_tokens\": 1024,\n  \"temperature\": 0.3,\n  \"system\": \"Eres la Dra. Ana Valverde, radióloga de mama con 20 años de experiencia en imagen mamaria diagnóstica y clasificación ACR BIRADS. Eres moderadora de esta discusión multidisciplinaria. Tu rol es: (1) presentar el caso clínico con precisión radiológica, (2) justificar la categoría BIRADS 4B basándote en los hallazgos de imagen, (3) enumerar las características que hacen a esta lesión sospechosa pero no definitivamente maligna, (4) proponer la siguiente conducta desde el punto de vista radiológico. Responde con precisión técnica, usa terminología ACR BIRADS correcta. Estructura tu respuesta con secciones: PRESENTACION DEL CASO, JUSTIFICACION BIRADS 4B, HALLAZGOS CLAVE, CONDUCTA RADIOLOGICA PROPUESTA.\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"RONDA 1 - PRESENTACION DEL CASO\\n\\nCaso clínico: {{ $('Configurar Caso Clinico').item.json.caso_clinico }}\\n\\nComo moderadora y radióloga de mama, presenta este caso al comité multidisciplinario y da tu valoración inicial desde el punto de vista de imagen.\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "8c4ae9d7-ad16-4a35-b9d9-3a6bb62a06c8",
+      "name": "R1 - Radióloga (Moderadora)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        16,
+        -64
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $('Configurar Caso Clinico').item.json.anthropic_api_key }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"{{ $('Configurar Caso Clinico').item.json.modelo_debate }}\",\n  \"max_tokens\": 1024,\n  \"temperature\": 0.3,\n  \"system\": \"Eres el Dr. Carlos Mendoza, cirujano oncólogo de mama con 18 años de experiencia en cirugía mamaria conservadora, mastectomía, biopsia selectiva de ganglio centinela (BSGC) y oncoplastia. Participas en un comité multidisciplinario para discutir una lesión BIRADS 4B. Tu rol es evaluar: (1) si la paciente requiere intervención quirúrgica primaria o biopsia percutánea primero, (2) factores de riesgo quirúrgico, (3) timing y tipo de procedimiento si se confirma malignidad, (4) consideraciones oncoplásticas. Argumenta desde evidencia quirúrgica actual. Estructura: VALORACION QUIRURGICA, INDICACION DE BIOPSIA vs CIRUGIA, PLAN QUIRURGICO POTENCIAL, CONSIDERACIONES ESPECIALES.\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"RONDA 1 - VALORACION INICIAL\\n\\nCaso clínico: {{ $('Configurar Caso Clinico').item.json.caso_clinico }}\\n\\nComo cirujano oncólogo de mama, da tu valoración inicial sobre este caso BIRADS 4B.\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "38dcfacb-f839-4136-8f7d-148e72e77067",
+      "name": "R1 - Cirujano Oncólogo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $('Configurar Caso Clinico').item.json.anthropic_api_key }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"{{ $('Configurar Caso Clinico').item.json.modelo_debate }}\",\n  \"max_tokens\": 1024,\n  \"temperature\": 0.3,\n  \"system\": \"Eres la Dra. Patricia Roldán, oncóloga médica especialista en cáncer de mama con certificación en medicina de precisión y oncogenética. Participas en un comité multidisciplinario para BIRADS 4B. Tu rol es evaluar: (1) probabilidad pre-biopsia de malignidad y subtipos moleculares posibles, (2) implicaciones sistémicas si se confirma malignidad, (3) indicación de estudio BRCA/panel genético, (4) potencial de neoadyuvancia vs adyuvancia, (5) estadificación necesaria. Estructura: RIESGO SISTEMICO, PERFIL MOLECULAR ESTIMADO, GENETICA Y RIESGO HEREDITARIO, PLAN ONCOLOGICO POTENCIAL, ESTUDIOS ADICIONALES REQUERIDOS.\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"RONDA 1 - VALORACION INICIAL\\n\\nCaso clínico: {{ $('Configurar Caso Clinico').item.json.caso_clinico }}\\n\\nComo oncóloga médica, da tu valoración inicial sobre el riesgo sistémico y las implicaciones oncológicas de este BIRADS 4B.\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "fb532962-5a2c-46a6-a1c1-0839a13dafbf",
+      "name": "R1 - Oncóloga Médica",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $('Configurar Caso Clinico').item.json.anthropic_api_key }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"{{ $('Configurar Caso Clinico').item.json.modelo_debate }}\",\n  \"max_tokens\": 1024,\n  \"temperature\": 0.3,\n  \"system\": \"Eres el Dr. Rubén Castillo, patólogo especialista en patología mamaria con experiencia en citopatología, histopatología y biomarcadores de cáncer de mama. Participas en un comité multidisciplinario para BIRADS 4B. Tu rol es definir: (1) el tipo de biopsia que aportará diagnóstico más preciso (BAAF, BAG 14G, BAG 16G, biopsia por vacío), (2) protocolo de procesamiento de la muestra, (3) panel de inmunohistoquímica óptimo (RE, RP, HER2, Ki67, p53), (4) diagnósticos histológicos diferenciales a considerar, (5) correlación radiológico-patológica esperada. Estructura: TIPO DE BIOPSIA RECOMENDADA, PROTOCOLO PATOLOGICO, DIAGNOSTICOS DIFERENCIALES, IHQ RECOMENDADA, CORRELACION ESPERADA.\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"RONDA 1 - VALORACION INICIAL\\n\\nCaso clínico: {{ $('Configurar Caso Clinico').item.json.caso_clinico }}\\n\\nComo patólogo especialista, define el tipo de biopsia óptima y el protocolo diagnóstico para este BIRADS 4B.\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "eeb854ca-77f8-4941-9b09-907b68852813",
+      "name": "R1 - Patólogo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $('Configurar Caso Clinico').item.json.anthropic_api_key }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"{{ $('Configurar Caso Clinico').item.json.modelo_debate }}\",\n  \"max_tokens\": 1024,\n  \"temperature\": 0.3,\n  \"system\": \"Eres la Dra. Sofía Herrera, ginecóloga mastóloga con 15 años de experiencia en patología mamaria benigna y maligna, consejería hormonal y genética. Participas en un comité multidisciplinario para BIRADS 4B. Tu rol es integrar: (1) el contexto hormonal y reproductivo de la paciente, (2) factores de riesgo ginecológicos (menarquia, menopausia, uso de ACO/TRH), (3) impacto del contexto hormonal en el manejo, (4) consejería psicológica y apoyo a la paciente, (5) seguimiento ginecológico integral. Estructura: CONTEXTO HORMONAL Y REPRODUCTIVO, FACTORES DE RIESGO GINECOLOGICO, IMPACTO HORMONAL EN LA CONDUCTA, CONSEJERIA A LA PACIENTE, SEGUIMIENTO INTEGRAL.\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"RONDA 1 - VALORACION INICIAL\\n\\nCaso clínico: {{ $('Configurar Caso Clinico').item.json.caso_clinico }}\\n\\nComo ginecóloga mastóloga, integra el contexto clínico ginecológico y hormonal relevante para este BIRADS 4B.\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "14608ee8-3437-4ae7-bd32-3f01da79a9df",
+      "name": "R1 - Ginecóloga Mastóloga",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combineBySql",
+        "query": "SELECT * FROM t1 UNION ALL SELECT * FROM t2 UNION ALL SELECT * FROM t3 UNION ALL SELECT * FROM t4 UNION ALL SELECT * FROM t5"
+      },
+      "id": "9402753f-b3c9-40d3-9297-8f42a8e56ddc",
+      "name": "Merge - Ronda 1",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        272,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Recopilar todas las respuestas de la Ronda 1\nconst items = $input.all();\n\nconst especialistas = [\n  { nombre: 'Dra. Ana Valverde', rol: 'Radióloga de Mama (Moderadora)' },\n  { nombre: 'Dr. Carlos Mendoza', rol: 'Cirujano Oncólogo de Mama' },\n  { nombre: 'Dra. Patricia Roldán', rol: 'Oncóloga Médica' },\n  { nombre: 'Dr. Rubén Castillo', rol: 'Patólogo Especialista' },\n  { nombre: 'Dra. Sofía Herrera', rol: 'Ginecóloga Mastóloga' }\n];\n\nlet discusion_r1 = '=== RONDA 1: VALORACIONES INICIALES ===\\n\\n';\nconst respuestas_r1 = [];\n\nfor (let i = 0; i < items.length; i++) {\n  const item = items[i];\n  const especialista = especialistas[i] || { nombre: `Especialista ${i+1}`, rol: 'No definido' };\n  \n  let respuesta = '';\n  if (item.json && item.json.content && item.json.content[0]) {\n    respuesta = item.json.content[0].text || 'Sin respuesta';\n  } else if (item.json && item.json.error) {\n    respuesta = `ERROR: ${JSON.stringify(item.json.error)}`;\n  }\n  \n  respuestas_r1.push({\n    especialista: especialista.nombre,\n    rol: especialista.rol,\n    respuesta: respuesta\n  });\n  \n  discusion_r1 += `--- ${especialista.nombre} (${especialista.rol}) ---\\n${respuesta}\\n\\n`;\n}\n\nreturn [{\n  json: {\n    discusion_ronda1: discusion_r1,\n    respuestas_r1: respuestas_r1,\n    caso_clinico: $('Configurar Caso Clinico').first().json.caso_clinico,\n    anthropic_api_key: $('Configurar Caso Clinico').first().json.anthropic_api_key,\n    modelo_debate: $('Configurar Caso Clinico').first().json.modelo_debate,\n    modelo_sintesis: $('Configurar Caso Clinico').first().json.modelo_sintesis\n  }\n}];"
+      },
+      "id": "8202cfd7-2f47-409e-aa9a-08a3541356a7",
+      "name": "Formatear Ronda 1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $json.anthropic_api_key }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"{{ $json.modelo_debate }}\",\n  \"max_tokens\": 1200,\n  \"temperature\": 0.4,\n  \"system\": \"Eres la Dra. Ana Valverde, radióloga de mama y moderadora. En esta segunda ronda, debes: (1) responder a los puntos planteados por tus colegas, (2) aclarar o defender los hallazgos radiológicos si fueron cuestionados, (3) integrar los puntos de vista clínicos con la imagen, (4) proponer si se necesitan estudios de imagen adicionales (RM de mama, PET, ecografía contralateral). Sé directa y debate con evidencia.\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"RONDA 2 - DEBATE Y RESPUESTA A COLEGAS\\n\\nCaso original: {{ $json.caso_clinico }}\\n\\nDiscusión de la Ronda 1:\\n{{ $json.discusion_ronda1 }}\\n\\nComo radióloga moderadora, responde a los puntos planteados por el cirujano, la oncóloga, el patólogo y la ginecóloga. ¿Qué aspectos de imagen adicionales son relevantes para el debate?\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "7de3ef36-0f65-4369-b3e5-93228dc3be28",
+      "name": "R2 - Radióloga Debate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $json.anthropic_api_key }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"{{ $json.modelo_debate }}\",\n  \"max_tokens\": 1200,\n  \"temperature\": 0.4,\n  \"system\": \"Eres el Dr. Carlos Mendoza, cirujano oncólogo. En esta segunda ronda, debate con tus colegas: (1) ¿estás de acuerdo con el tipo de biopsia propuesta por el patólogo?, (2) ¿qué información de la oncóloga modifica tu plan quirúrgico?, (3) ¿los factores hormonales de la ginecóloga cambian el timing?, (4) posiciona tu recomendación final quirúrgica. Sé específico y basa en evidencia (NCCN, ESMO, guías de San Gallen).\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"RONDA 2 - DEBATE\\n\\nCaso original: {{ $json.caso_clinico }}\\n\\nDiscusión de la Ronda 1:\\n{{ $json.discusion_ronda1 }}\\n\\nComo cirujano oncólogo, responde a los argumentos de tus colegas y refina tu posición quirúrgica.\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "91ace664-d488-43c6-9b55-f0cfd148886f",
+      "name": "R2 - Cirujano Debate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $json.anthropic_api_key }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"{{ $json.modelo_debate }}\",\n  \"max_tokens\": 1200,\n  \"temperature\": 0.4,\n  \"system\": \"Eres la Dra. Patricia Roldán, oncóloga médica. En esta segunda ronda debate: (1) ¿los hallazgos radiológicos sugieren un subtipo molecular específico?, (2) ¿el antecedente familiar justifica panel genético urgente antes de decidir cirugía?, (3) ¿en qué escenarios indicarías neoadyuvancia si se confirma malignidad?, (4) ¿qué estudios de estadificación son INDISPENSABLES? Referencia guías NCCN, ESMO 2024.\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"RONDA 2 - DEBATE\\n\\nCaso original: {{ $json.caso_clinico }}\\n\\nDiscusión de la Ronda 1:\\n{{ $json.discusion_ronda1 }}\\n\\nComo oncóloga médica, debate con el equipo sobre el manejo sistémico y la necesidad de estudios adicionales antes y después de la biopsia.\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "f60365c5-3b5d-41f6-ac46-17592e4f9f2d",
+      "name": "R2 - Oncóloga Debate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $json.anthropic_api_key }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"{{ $json.modelo_debate }}\",\n  \"max_tokens\": 1200,\n  \"temperature\": 0.4,\n  \"system\": \"Eres el Dr. Rubén Castillo, patólogo. En esta segunda ronda debate: (1) ¿el tipo de biopsia que propuso el cirujano es suficiente para el panel IHQ completo?, (2) ¿qué impacto tiene en el diagnóstico si la correlación radiológico-patológica es discordante?, (3) ¿cuándo deberías intervenir para pedir re-biopsia?, (4) ¿qué biomarcadores adicionales (FISH HER2, Ki67 exacto, PD-L1) cambiarían el manejo oncológico? Sé preciso en los criterios de discordancia y re-biopsia.\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"RONDA 2 - DEBATE\\n\\nCaso original: {{ $json.caso_clinico }}\\n\\nDiscusión de la Ronda 1:\\n{{ $json.discusion_ronda1 }}\\n\\nComo patólogo, debate sobre el protocolo diagnóstico óptimo y los criterios de discordancia radiológico-patológica.\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "fd037f8f-0c7a-4c21-82cb-b8bafd2e9fe3",
+      "name": "R2 - Patólogo Debate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $json.anthropic_api_key }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"{{ $json.modelo_debate }}\",\n  \"max_tokens\": 1200,\n  \"temperature\": 0.4,\n  \"system\": \"Eres la Dra. Sofía Herrera, ginecóloga mastóloga. En esta segunda ronda debate: (1) ¿el estado hormonal de la paciente (perimenopausia probable a los 48 años) modifica el riesgo de malignidad del BIRADS 4B?, (2) ¿la historia familiar materna justifica consejo genético urgente?, (3) ¿qué papel tienen los anticonceptivos o TRH si los hubiera?, (4) ¿cómo manejarías la mama contralateral y el seguimiento del ovario? Integra la visión ginecológica completa.\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"RONDA 2 - DEBATE\\n\\nCaso original: {{ $json.caso_clinico }}\\n\\nDiscusión de la Ronda 1:\\n{{ $json.discusion_ronda1 }}\\n\\nComo ginecóloga mastóloga, debate sobre el impacto del estado hormonal y ginecológico en el manejo de este BIRADS 4B.\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "107765a1-3a18-4cf5-9734-5f14371cac0b",
+      "name": "R2 - Ginecóloga Debate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combineBySql",
+        "query": "SELECT * FROM t1 UNION ALL SELECT * FROM t2 UNION ALL SELECT * FROM t3 UNION ALL SELECT * FROM t4 UNION ALL SELECT * FROM t5"
+      },
+      "id": "22480d72-febf-429b-90f0-996eec88e784",
+      "name": "Merge - Ronda 2",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        960,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nconst especialistas = [\n  { nombre: 'Dra. Ana Valverde', rol: 'Radióloga Moderadora' },\n  { nombre: 'Dr. Carlos Mendoza', rol: 'Cirujano Oncólogo' },\n  { nombre: 'Dra. Patricia Roldán', rol: 'Oncóloga Médica' },\n  { nombre: 'Dr. Rubén Castillo', rol: 'Patólogo' },\n  { nombre: 'Dra. Sofía Herrera', rol: 'Ginecóloga Mastóloga' }\n];\n\nlet discusion_r2 = '=== RONDA 2: DEBATE Y CONTRAPOSICION ===\\n\\n';\nconst respuestas_r2 = [];\n\nfor (let i = 0; i < items.length; i++) {\n  const item = items[i];\n  const especialista = especialistas[i] || { nombre: `Especialista ${i+1}`, rol: 'No definido' };\n  \n  let respuesta = '';\n  if (item.json && item.json.content && item.json.content[0]) {\n    respuesta = item.json.content[0].text || 'Sin respuesta';\n  }\n  \n  respuestas_r2.push({\n    especialista: especialista.nombre,\n    rol: especialista.rol,\n    respuesta: respuesta\n  });\n  \n  discusion_r2 += `--- ${especialista.nombre} (${especialista.rol}) ---\\n${respuesta}\\n\\n`;\n}\n\n// Recuperar datos previos del nodo Formatear Ronda 1\nconst ronda1Data = $('Formatear Ronda 1').first().json;\n\nreturn [{\n  json: {\n    discusion_ronda1: ronda1Data.discusion_ronda1,\n    discusion_ronda2: discusion_r2,\n    respuestas_r2: respuestas_r2,\n    caso_clinico: ronda1Data.caso_clinico,\n    anthropic_api_key: ronda1Data.anthropic_api_key,\n    modelo_debate: ronda1Data.modelo_debate,\n    modelo_sintesis: ronda1Data.modelo_sintesis\n  }\n}];"
+      },
+      "id": "a33148d5-082b-41be-ac5b-f83712d7927d",
+      "name": "Formatear Ronda 2",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1184,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $json.anthropic_api_key }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"{{ $json.modelo_sintesis }}\",\n  \"max_tokens\": 2500,\n  \"temperature\": 0.2,\n  \"system\": \"Eres un médico director de comité tumoral de mama con 25 años de experiencia coordinando comités multidisciplinarios en centros de excelencia oncológica. Tu función es sintetizar la discusión completa del comité y emitir el CONSENSO FINAL con las recomendaciones de acción. Debes: (1) identificar los puntos de ACUERDO entre especialistas, (2) resolver o aclarar los puntos de DESACUERDO, (3) emitir recomendaciones JERARQUIZADAS basadas en evidencia, (4) definir el camino crítico de manejo, (5) establecer criterios de seguimiento. El output debe ser claro, accionable y directamente útil para el médico tratante. Usa guías NCCN 2024, ESMO 2024, ACR Practice Parameters.\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"SINTESIS FINAL DEL COMITE MULTIDISCIPLINARIO\\n\\nCASO CLINICO:\\n{{ $json.caso_clinico }}\\n\\n{{ $json.discusion_ronda1 }}\\n\\n{{ $json.discusion_ronda2 }}\\n\\nComo director del comité, emite el CONSENSO FINAL con el plan de acción para este BIRADS 4B. Estructura tu respuesta en:\\n\\n1. RESUMEN EJECUTIVO (3-5 líneas)\\n2. PUNTOS DE CONSENSO DEL COMITE\\n3. PUNTOS DE DISCREPANCIA Y RESOLUCION\\n4. RECOMENDACIONES JERARQUIZADAS (numeradas por prioridad)\\n5. CAMINO CRITICO DE MANEJO (timeline con pasos secuenciales)\\n6. CRITERIOS DE SEGUIMIENTO Y VIGILANCIA\\n7. NIVEL DE EVIDENCIA DE LAS RECOMENDACIONES\\n8. CONSIDERACIONES ETICAS Y DE CONSENTIMIENTO\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "35617732-b80b-4558-9fa2-f1d7bd007ef7",
+      "name": "Moderador - Síntesis Final (Opus)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1424,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const sintesisItem = $input.first();\nconst ronda2Data = $('Formatear Ronda 2').first().json;\n\nlet consenso = 'Sin consenso generado';\nif (sintesisItem.json && sintesisItem.json.content && sintesisItem.json.content[0]) {\n  consenso = sintesisItem.json.content[0].text;\n}\n\nconst reporte = {\n  titulo: 'REPORTE DE COMITE MULTIDISCIPLINARIO - BIRADS 4B',\n  fecha: new Date().toISOString(),\n  caso_clinico: ronda2Data.caso_clinico,\n  especialistas: [\n    'Dra. Ana Valverde - Radióloga de Mama (Moderadora)',\n    'Dr. Carlos Mendoza - Cirujano Oncólogo de Mama',\n    'Dra. Patricia Roldán - Oncóloga Médica',\n    'Dr. Rubén Castillo - Patólogo Especialista',\n    'Dra. Sofía Herrera - Ginecóloga Mastóloga'\n  ],\n  modelos_ia: {\n    debate: ronda2Data.modelo_debate,\n    sintesis: ronda2Data.modelo_sintesis\n  },\n  rondas_completadas: 2,\n  discusion_completa: {\n    ronda_1: ronda2Data.discusion_ronda1,\n    ronda_2: ronda2Data.discusion_ronda2\n  },\n  consenso_final: consenso,\n  disclaimer: 'Este reporte es generado por IA como apoyo a la decision clinica. No reemplaza el juicio medico profesional ni la discusion con el paciente. Debe ser revisado y validado por medicos especialistas certificados antes de su aplicacion clinica.'\n};\n\n// Formato de texto para visualizacion\nconst reporte_texto = `\n${'='.repeat(60)}\n${reporte.titulo}\n${'='.repeat(60)}\nFecha: ${reporte.fecha}\n\nCASO CLINICO:\n${reporte.caso_clinico}\n\nESPECIALISTAS PARTICIPANTES:\n${reporte.especialistas.map((e, i) => `${i+1}. ${e}`).join('\\n')}\n\nMODELOS DE IA UTILIZADOS:\n- Rondas de debate: ${reporte.modelos_ia.debate}\n- Sintesis final: ${reporte.modelos_ia.sintesis}\n\n${reporte.discusion_completa.ronda_1}\n\n${reporte.discusion_completa.ronda_2}\n\n${'='.repeat(60)}\nCONSENSO FINAL DEL COMITE\n${'='.repeat(60)}\n${reporte.consenso_final}\n\n${'='.repeat(60)}\nDISCLAIMER: ${reporte.disclaimer}\n${'='.repeat(60)}\n`;\n\nreturn [{\n  json: {\n    reporte: reporte,\n    reporte_texto: reporte_texto\n  }\n}];"
+      },
+      "id": "06cb216a-15bf-4718-8c91-7feb5c0a3033",
+      "name": "Generar Reporte Final",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1648,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.reporte, null, 2) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "febf54a6-ebec-4976-976e-c283512589be",
+      "name": "Respuesta Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1872,
+        320
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - Caso Clinico": {
+      "main": [
+        [
+          {
+            "node": "Configurar Caso Clinico",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configurar Caso Clinico": {
+      "main": [
+        [
+          {
+            "node": "R1 - Radióloga (Moderadora)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "R1 - Cirujano Oncólogo",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "R1 - Oncóloga Médica",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "R1 - Patólogo",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "R1 - Ginecóloga Mastóloga",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "R1 - Radióloga (Moderadora)": {
+      "main": [
+        [
+          {
+            "node": "Merge - Ronda 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "R1 - Cirujano Oncólogo": {
+      "main": [
+        [
+          {
+            "node": "Merge - Ronda 1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge - Ronda 1": {
+      "main": [
+        [
+          {
+            "node": "Formatear Ronda 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatear Ronda 1": {
+      "main": [
+        [
+          {
+            "node": "R2 - Radióloga Debate",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "R2 - Cirujano Debate",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "R2 - Oncóloga Debate",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "R2 - Patólogo Debate",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "R2 - Ginecóloga Debate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "R2 - Radióloga Debate": {
+      "main": [
+        [
+          {
+            "node": "Merge - Ronda 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "R2 - Cirujano Debate": {
+      "main": [
+        [
+          {
+            "node": "Merge - Ronda 2",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge - Ronda 2": {
+      "main": [
+        [
+          {
+            "node": "Formatear Ronda 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatear Ronda 2": {
+      "main": [
+        [
+          {
+            "node": "Moderador - Síntesis Final (Opus)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Moderador - Síntesis Final (Opus)": {
+      "main": [
+        [
+          {
+            "node": "Generar Reporte Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generar Reporte Final": {
+      "main": [
+        [
+          {
+            "node": "Respuesta Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "7ecf3343-6ba7-4cf2-9ed9-33c51c396874",
+  "meta": {
+    "instanceId": "d875ae845499579163d494e2ac7c7af243f9e8569169057b531543fe51f549c7"
+  },
+  "id": "Wi7MR0I2ldw7AcDc",
+  "tags": []
+}
