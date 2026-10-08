@@ -129,3 +129,30 @@ El modelo `qwen3.5:9b-local` (Oncóloga) recibe el prefijo `/no_think` tanto en 
 
 Reporte generado por agentes de IA local (LiteLLM + Ollama).  
 **No reemplaza el juicio médico profesional.** Debe ser revisado y validado por médicos especialistas certificados antes de su aplicación clínica.
+
+---
+
+## Stack en Docker (v2)
+
+Ollama + LiteLLM + n8n corren juntos en la red `birads-net`.
+
+```bash
+cp .env.example .env
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d   # con GPU NVIDIA
+docker compose up -d                                                   # solo CPU
+```
+
+| Servicio | URL host | URL interna |
+|----------|----------|-------------|
+| n8n | http://localhost:5678 | — |
+| LiteLLM | http://localhost:4000 (key `sk-local`) | http://litellm:4000 |
+| Ollama | http://localhost:11434 | http://ollama:11434 |
+
+- Los modelos se montan en solo lectura desde `OLLAMA_MODELS_PATH` (no se descargan de nuevo).
+- Alias de modelos en `litellm/config.yaml`; n8n recibe `LITELLM_URL` y `LITELLM_API_KEY` por entorno.
+- Importar/publicar el workflow (usar `MSYS_NO_PATHCONV=1` en Git Bash):
+  ```bash
+  docker exec birads-n8n n8n import:workflow --input=/workflows/birads4b_discussion_v2.json
+  docker exec birads-n8n n8n publish:workflow --id=5GfZMChnzMznWhY2 && docker restart birads-n8n
+  ```
+- Webhook de producción: `POST http://localhost:5678/webhook/birads4b-discussion` con `{"caso_clinico": "..."}`.
