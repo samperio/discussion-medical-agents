@@ -1,0 +1,981 @@
+{
+  "name": "birads4b_discussion_v2",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "birads4b-discussion",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "fe109d59-eabc-4827-9834-2647cb1ab340",
+      "name": "Webhook - Caso Clinico",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        11376,
+        3152
+      ],
+      "webhookId": "birads4b-webhook-001"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "caso-clinico",
+              "name": "caso_clinico",
+              "value": "={{ $json.body.caso_clinico ?? 'Paciente femenina de 48 años. Mamografía de tamizaje detecta lesión espiculada de 1.2cm en cuadrante superior externo de mama derecha. Ecografía muestra nódulo hipoecogénico con sombra acústica posterior, márgenes irregulares. Sin adenopatías axilares palpables. Antecedente familiar: madre con cáncer de mama a los 52 años. Categoría BIRADS 4B.' }}",
+              "type": "string"
+            },
+            {
+              "id": "paciente-nombre",
+              "name": "paciente_nombre",
+              "value": "={{ $json.body.paciente_nombre ?? 'Paciente Angeles' }}",
+              "type": "string"
+            },
+            {
+              "id": "litellm-url",
+              "name": "litellm_url",
+              "value": "={{ $json.body.litellm_url ?? $env.LITELLM_URL ?? 'http://localhost:4000' }}",
+              "type": "string"
+            },
+            {
+              "id": "litellm-key",
+              "name": "litellm_key",
+              "value": "={{ $json.body.litellm_key ?? $env.LITELLM_API_KEY ?? 'sk-local' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "020acd76-479e-4459-b7f6-4b39253540e7",
+      "name": "Configurar Caso Clinico",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        11600,
+        3152
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.litellm_url }}/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.litellm_key }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gemma3:270m\",\n  \"max_tokens\": 300,\n  \"temperature\": 0.1,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Eres un asistente de triaje médico. Tu única función es verificar si el caso clínico contiene los elementos mínimos necesarios: paciente, lesión, categoría BIRADS y algún contexto clínico. Responde SOLO con JSON: {\\\"valido\\\": true/false, \\\"motivo\\\": \\\"...\\\", \\\"resumen_caso\\\": \\\"...\\\"}\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Valida este caso clínico y extrae un resumen en una línea: {{ $json.caso_clinico }}\"\n    }\n  ]\n}",
+        "options": {
+          "timeout": 1800000
+        }
+      },
+      "id": "b05f70f3-87bb-4c90-9e0a-76593c847b15",
+      "name": "Pre-Validación Caso (gemma3:270m)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        11840,
+        3152
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const validacion = $input.first();\nconst config = $('Configurar Caso Clinico').first().json;\n\nlet valido = true;\nlet resumen = '';\n\ntry {\n  const content = validacion.json?.choices?.[0]?.message?.content ?? '{\"valido\":true}';\n  const parsed = JSON.parse(content);\n  valido = parsed.valido !== false;\n  resumen = parsed.resumen_caso ?? config.caso_clinico.substring(0, 120) + '...';\n} catch(e) {\n  // Si gemma no pudo parsear JSON, continúa igual\n  resumen = config.caso_clinico.substring(0, 120) + '...';\n}\n\nif (!valido) {\n  throw new Error('Caso clínico inválido o incompleto. Verifica el input.');\n}\n\nreturn [{\n  json: {\n    caso_clinico: config.caso_clinico,\n    resumen_caso: resumen,\n    paciente_nombre: config.paciente_nombre,\n    litellm_url: config.litellm_url,\n    litellm_key: config.litellm_key,\n    validacion_ok: true\n  }\n}];"
+      },
+      "id": "f0f90c4f-a7f2-463a-827f-d3316521baf7",
+      "name": "Verificar Validación",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        12080,
+        3152
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.litellm_url }}/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.litellm_key }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"qwen3:14b\",\n  \"max_tokens\": 2048,\n  \"temperature\": 0.3,\n  \"think\": false,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Eres la Dra. Ana Valverde, radióloga de mama con 20 años de experiencia en imagen mamaria diagnóstica y clasificación ACR BIRADS. Eres moderadora de esta discusión multidisciplinaria. Tu rol: (1) presentar el caso con precisión radiológica, (2) justificar la categoría BIRADS 4B con los hallazgos de imagen, (3) enumerar características que hacen la lesión sospechosa pero no definitivamente maligna, (4) proponer conducta radiológica. Usa terminología ACR BIRADS correcta. Estructura con secciones: PRESENTACION DEL CASO / JUSTIFICACION BIRADS 4B / HALLAZGOS CLAVE / CONDUCTA RADIOLOGICA PROPUESTA.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"RONDA 1 - PRESENTACION DEL CASO\\n\\nCaso clínico: {{ $json.caso_clinico }}\\n\\nComo moderadora y radióloga de mama, presenta este caso al comité multidisciplinario y da tu valoración inicial desde el punto de vista de imagen.\"\n    }\n  ]\n}",
+        "options": {
+          "timeout": 1800000
+        }
+      },
+      "id": "bfe47d69-099d-494d-9485-a9af5d635b2c",
+      "name": "R1 - Radióloga qwen3:14b",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        12320,
+        2848
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.litellm_url }}/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.litellm_key }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama3.1:8b-local\",\n  \"max_tokens\": 1024,\n  \"temperature\": 0.3,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Eres el Dr. Carlos Mendoza, cirujano oncólogo de mama con 18 años de experiencia en cirugía mamaria conservadora, mastectomía, biopsia selectiva de ganglio centinela (BSGC) y oncoplastia. Evalúa: (1) si la paciente requiere intervención quirúrgica o biopsia percutánea primero, (2) factores de riesgo quirúrgico, (3) timing y tipo de procedimiento si se confirma malignidad, (4) consideraciones oncoplásticas. Estructura: VALORACION QUIRURGICA / INDICACION BIOPSIA vs CIRUGIA / PLAN QUIRURGICO POTENCIAL / CONSIDERACIONES ESPECIALES.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"RONDA 1 - VALORACION INICIAL\\n\\nCaso clínico: {{ $json.caso_clinico }}\\n\\nComo cirujano oncólogo de mama, da tu valoración inicial sobre este caso BIRADS 4B.\"\n    }\n  ]\n}",
+        "options": {
+          "timeout": 1800000
+        }
+      },
+      "id": "8dbe7c02-592e-42d2-8a71-a1c2a48febc3",
+      "name": "R1 - Cirujano llama3.1:8b",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        12320,
+        3008
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.litellm_url }}/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.litellm_key }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"qwen3.5:9b-local\",\n  \"max_tokens\": 2048,\n  \"temperature\": 0.3,\n  \"think\": false,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"/no_think\\nEres la Dra. Patricia Roldán, oncóloga médica especialista en cáncer de mama con certificación en medicina de precisión y oncogenética. Responde directamente sin razonamiento interno previo. Evalúa: (1) probabilidad pre-biopsia de malignidad y subtipos moleculares posibles, (2) implicaciones sistémicas si se confirma malignidad, (3) indicación de estudio BRCA/panel genético, (4) potencial de neoadyuvancia vs adyuvancia, (5) estadificación necesaria. Estructura: RIESGO SISTEMICO / PERFIL MOLECULAR ESTIMADO / GENETICA Y RIESGO HEREDITARIO / PLAN ONCOLOGICO POTENCIAL / ESTUDIOS REQUERIDOS.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"/no_think\\nRONDA 1 - VALORACION INICIAL\\n\\nCaso clínico: {{ $json.caso_clinico }}\\n\\nComo oncóloga médica, da tu valoración inicial sobre el riesgo sistémico y las implicaciones oncológicas de este BIRADS 4B.\"\n    }\n  ]\n}",
+        "options": {
+          "timeout": 1800000
+        }
+      },
+      "id": "552acd2a-febd-47cd-80e6-d9e4f2beb5c7",
+      "name": "R1 - Oncóloga qwen3.5:9b",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        12320,
+        3168
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.litellm_url }}/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.litellm_key }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"tomng/lfm2.5-instruct:latest\",\n  \"max_tokens\": 1024,\n  \"temperature\": 0.3,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Eres el Dr. Rubén Castillo, patólogo especialista en patología mamaria con experiencia en citopatología, histopatología y biomarcadores. Define: (1) el tipo de biopsia más precisa (BAAF, BAG 14G, BAG 16G, biopsia por vacío), (2) protocolo de procesamiento de muestra, (3) panel de inmunohistoquímica óptimo (RE, RP, HER2, Ki67, p53), (4) diagnósticos histológicos diferenciales, (5) correlación radiológico-patológica esperada. Estructura: TIPO DE BIOPSIA RECOMENDADA / PROTOCOLO PATOLOGICO / DIAGNOSTICOS DIFERENCIALES / IHQ RECOMENDADA / CORRELACION ESPERADA.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"RONDA 1 - VALORACION INICIAL\\n\\nCaso clínico: {{ $json.caso_clinico }}\\n\\nComo patólogo especialista, define el tipo de biopsia óptima y el protocolo diagnóstico para este BIRADS 4B.\"\n    }\n  ]\n}",
+        "options": {
+          "timeout": 1800000
+        }
+      },
+      "id": "5194fd63-45f2-4c14-8388-cd034300bd62",
+      "name": "R1 - Patólogo lfm2.5-instruct",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        12320,
+        3328
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.litellm_url }}/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.litellm_key }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama3.2-local\",\n  \"max_tokens\": 1024,\n  \"temperature\": 0.3,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Eres la Dra. Sofía Herrera, ginecóloga mastóloga con 15 años de experiencia en patología mamaria benigna y maligna, consejería hormonal y genética. Integra: (1) contexto hormonal y reproductivo de la paciente, (2) factores de riesgo ginecológicos (menarquia, menopausia, uso de ACO/TRH), (3) impacto del contexto hormonal en el manejo, (4) consejería psicológica y apoyo, (5) seguimiento ginecológico integral. Estructura: CONTEXTO HORMONAL Y REPRODUCTIVO / FACTORES DE RIESGO GINECOLOGICO / IMPACTO HORMONAL EN LA CONDUCTA / CONSEJERIA A LA PACIENTE / SEGUIMIENTO INTEGRAL.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"RONDA 1 - VALORACION INICIAL\\n\\nCaso clínico: {{ $json.caso_clinico }}\\n\\nComo ginecóloga mastóloga, integra el contexto clínico ginecológico y hormonal relevante para este BIRADS 4B.\"\n    }\n  ]\n}",
+        "options": {
+          "timeout": 1800000
+        }
+      },
+      "id": "271df133-8a2f-4100-93bd-68483c3630d6",
+      "name": "R1 - Ginecóloga llama3.2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        12320,
+        3488
+      ]
+    },
+    {
+      "parameters": {
+        "numberInputs": 6
+      },
+      "id": "358261af-e118-4fda-990f-1f9f89e3fb58",
+      "name": "Merge - Ronda 1",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        12592,
+        3168
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nconst especialistas = [\n  { nombre: 'Dra. Ana Valverde', rol: 'Radióloga de Mama (Moderadora)', modelo: 'qwen3:14b' },\n  { nombre: 'Dr. Carlos Mendoza', rol: 'Cirujano Oncólogo de Mama', modelo: 'llama3.1:8b-local' },\n  { nombre: 'Dra. Patricia Roldán', rol: 'Oncóloga Médica', modelo: 'qwen3.5:9b-local' },\n  { nombre: 'Dr. Rubén Castillo', rol: 'Patólogo Especialista', modelo: 'tomng/lfm2.5-instruct:latest' },\n  { nombre: 'Dra. Sofía Herrera', rol: 'Ginecóloga Mastóloga', modelo: 'llama3.2-local' },\n  { nombre: 'Dr. Andrés Navarro', rol: 'Oncólogo Radioterapeuta', modelo: 'llama3.1:8b-local' }\n];\n\nlet discusion_r1 = '=== RONDA 1: VALORACIONES INICIALES ===\\n\\n';\nconst respuestas_r1 = [];\n\nfor (let i = 0; i < items.length; i++) {\n  const item = items[i];\n  const esp = especialistas[i] || { nombre: `Especialista ${i+1}`, rol: 'No definido', modelo: 'desconocido' };\n\n  let respuesta = '';\n  if (item.json?.choices?.[0]?.message?.content) {\n    respuesta = item.json.choices[0].message.content;\n  } else if (item.json?.error) {\n    respuesta = `ERROR LiteLLM: ${JSON.stringify(item.json.error)}`;\n  } else {\n    respuesta = 'Sin respuesta del modelo.';\n  }\n\n  respuestas_r1.push({ especialista: esp.nombre, rol: esp.rol, modelo: esp.modelo, respuesta });\n  discusion_r1 += `--- ${esp.nombre} [${esp.modelo}] (${esp.rol}) ---\\n${respuesta}\\n\\n`;\n}\n\nconst ctx = $('Verificar Validación').first().json;\n\nreturn [{\n  json: {\n    discusion_ronda1: discusion_r1,\n    respuestas_r1,\n    caso_clinico: ctx.caso_clinico,\n    litellm_url: ctx.litellm_url,\n    litellm_key: ctx.litellm_key\n  }\n}];"
+      },
+      "id": "0f2afeca-4505-40fc-93f2-9f758dadf4c0",
+      "name": "Formatear Ronda 1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        12800,
+        3168
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const d   = $input.first().json;\nconst caso = d.caso_clinico;\nconst r1r  = d.respuestas_r1;\n\n// Contexto de debate: respuestas de los OTROS especialistas (excluye al actual)\nfunction debateContext(excludeIdx) {\n  return r1r\n    .filter((_, i) => i !== excludeIdx)\n    .map(e => '--- ' + e.especialista + ' (' + e.rol + ') ---\\n' + e.respuesta)\n    .join('\\n\\n');\n}\n\n// System prompts identicos a Ronda 1\nconst SYS = {\n  radiologo:  'Eres la Dra. Ana Valverde, radiologo de mama con 20 anos de experiencia en imagen mamaria diagnostica y clasificacion ACR BIRADS. Eres moderadora de esta discusion multidisciplinaria. Tu rol: (1) presentar el caso con precision radiologica, (2) justificar la categoria BIRADS 4B con los hallazgos de imagen, (3) enumerar caracteristicas que hacen la lesion sospechosa pero no definitivamente maligna, (4) proponer conducta radiologica. Usa terminologia ACR BIRADS correcta.',\n  cirujano:   'Eres el Dr. Carlos Mendoza, cirujano oncologo de mama con 18 anos de experiencia en cirugia mamaria conservadora, mastectomia, BSGC y oncoplastia. Evalua: (1) si la paciente requiere intervencion quirurgica o biopsia percutanea primero, (2) factores de riesgo quirurgico, (3) timing y tipo de procedimiento si se confirma malignidad, (4) consideraciones oncoplasticas.',\n  oncologo:   '/no_think\\nEres la Dra. Patricia Roldan, oncologa medica especialista en cancer de mama con certificacion en medicina de precision y oncogenetica. Responde directamente sin razonamiento interno previo. Evalua: (1) probabilidad pre-biopsia de malignidad y subtipos moleculares posibles, (2) implicaciones sistemicas si se confirma malignidad, (3) indicacion de estudio BRCA/panel genetico, (4) potencial de neoadyuvancia vs adyuvancia, (5) estadificacion necesaria.',\n  patologo:   'Eres el Dr. Ruben Castillo, patologo especialista en patologia mamaria. Define: (1) el tipo de biopsia mas precisa (BAAF, BAG 14G, BAG 16G, biopsia por vacio), (2) protocolo de procesamiento de muestra, (3) panel de IHQ optimo (RE, RP, HER2, Ki67, p53), (4) diagnosticos histologicos diferenciales, (5) correlacion radiologico-patologica esperada.',\n  ginecologo: 'Eres la Dra. Sofia Herrera, ginecologa mastologo con 15 anos de experiencia en patologia mamaria benigna y maligna. Integra: (1) contexto hormonal y reproductivo de la paciente, (2) factores de riesgo ginecologicos (menarquia, menopausia, uso de ACO/TRH), (3) impacto del contexto hormonal en el manejo, (4) consejeria psicologica y apoyo, (5) seguimiento ginecologico integral.',\n  radioterapeuta: 'Eres el Dr. Andres Navarro, oncologo radioterapeuta con 17 anos de experiencia en radioterapia de cancer de mama (hipofraccionamiento, boost, irradiacion parcial acelerada, irradiacion ganglionar). Evalua: (1) si la lesion, de confirmarse malignidad, tendria probable indicacion de radioterapia (conservadora vs post-mastectomia), (2) factores que modifican esa indicacion (tamano, margenes, ganglios, edad, subtipo), (3) contraindicaciones o consideraciones previas a RT, (4) secuencia optima con cirugia y tratamiento sistemico, (5) si el escenario es benigno o de riesgo, cuando NO se requiere RT.'\n};\n\n// Mensajes user de Ronda 1 (reproducidos para dar contexto de historial)\nconst USR1 = {\n  radiologo:  'RONDA 1 - PRESENTACION DEL CASO\\n\\nCaso clinico: ' + caso + '\\n\\nComo moderadora y radiologa de mama, presenta este caso al comite multidisciplinario y da tu valoracion inicial desde el punto de vista de imagen.',\n  cirujano:   'RONDA 1 - VALORACION INICIAL\\n\\nCaso clinico: ' + caso + '\\n\\nComo cirujano oncologo de mama, da tu valoracion inicial sobre este caso BIRADS 4B.',\n  oncologo:   '/no_think\\nRONDA 1 - VALORACION INICIAL\\n\\nCaso clinico: ' + caso + '\\n\\nComo oncologa medica, da tu valoracion inicial sobre el riesgo sistemico y las implicaciones oncologicas de este BIRADS 4B.',\n  patologo:   'RONDA 1 - VALORACION INICIAL\\n\\nCaso clinico: ' + caso + '\\n\\nComo patologo especialista, define el tipo de biopsia optima y el protocolo diagnostico para este BIRADS 4B.',\n  ginecologo: 'RONDA 1 - VALORACION INICIAL\\n\\nCaso clinico: ' + caso + '\\n\\nComo ginecologa mastologo, integra el contexto clinico ginecologico y hormonal relevante para este BIRADS 4B.',\n  radioterapeuta: 'RONDA 1 - VALORACION INICIAL\\n\\nCaso clinico: ' + caso + '\\n\\nComo oncologo radioterapeuta, da tu valoracion inicial sobre la eventual necesidad y planeacion de radioterapia en este BIRADS 4B.'\n};\n\n// Mensajes user de Ronda 2 (incluye contexto de los otros especialistas)\nconst USR2 = {\n  radiologo:  'RONDA 2 - DEBATE\\n\\nTus colegas han dado las siguientes valoraciones:\\n\\n' + debateContext(0) + '\\n\\nComo radiologa moderadora: (1) responde a los puntos planteados, (2) aclara o defiende tus hallazgos radiologicos si fueron cuestionados, (3) integra los puntos de vista clinicos con la imagen, (4) propone estudios adicionales necesarios (RM de mama, ecografia contralateral). Debate con evidencia ACR 2024.',\n  cirujano:   'RONDA 2 - DEBATE\\n\\nTus colegas han dado las siguientes valoraciones:\\n\\n' + debateContext(1) + '\\n\\nComo cirujano oncologo: (1) estas de acuerdo con el tipo de biopsia propuesta por el patologo?, (2) que informacion de la oncologa modifica tu plan quirurgico?, (3) los factores hormonales de la ginecologa cambian el timing?, (4) posiciona tu recomendacion quirurgica final. Basa en evidencia NCCN/ESMO/San Gallen.',\n  oncologo:   '/no_think\\nRONDA 2 - DEBATE\\n\\nTus colegas han dado las siguientes valoraciones:\\n\\n' + debateContext(2) + '\\n\\nComo oncologa medica: (1) los hallazgos radiologicos sugieren subtipo molecular especifico?, (2) hay antecedente familiar reportado que justifique panel genetico? (si no esta reportado, indicalo), (3) en que escenarios indicarias neoadyuvancia?, (4) que estudios de estadificacion son indispensables? Referencia guias NCCN/ESMO 2024.',\n  patologo:   'RONDA 2 - DEBATE\\n\\nTus colegas han dado las siguientes valoraciones:\\n\\n' + debateContext(3) + '\\n\\nComo patologo: (1) el tipo de biopsia que propuso el cirujano es suficiente para el panel IHQ completo?, (2) que pasa si la correlacion radiologico-patologica es discordante?, (3) cuando pediras re-biopsia?, (4) que biomarcadores adicionales (FISH HER2, Ki67, PD-L1) cambiarian el manejo?',\n  ginecologo: 'RONDA 2 - DEBATE\\n\\nTus colegas han dado las siguientes valoraciones:\\n\\n' + debateContext(4) + '\\n\\nComo ginecologa mastologo: (1) el estado hormonal de la paciente (solo si esta reportado en el caso; si no, indicalo) modifica el riesgo BIRADS 4B?, (2) los antecedentes familiares (solo si estan reportados; si no, indicalo) justifican consejo genetico?, (3) que papel tienen los ACO o TRH si los hubiera?, (4) como manejaras mama contralateral y seguimiento ovarico?',\n  radioterapeuta: 'RONDA 2 - DEBATE\\n\\nTus colegas han dado las siguientes valoraciones:\\n\\n' + debateContext(5) + '\\n\\nComo oncologo radioterapeuta: (1) el tamano y tipo de cirugia propuesta por el cirujano permite conservar la mama y que RT seria necesaria?, (2) el subtipo o hallazgos patologicos que menciona el patologo modifican la indicacion de RT o de boost?, (3) la secuencia con neoadyuvancia/adyuvancia de la oncologa cambia el momento de la RT?, (4) si el resultado final es benigno o de alto riesgo, que seguimiento propones sin RT? Referencia NCCN/ESTRO/ASTRO.'\n};\n\n// Regla comun de fidelidad al caso (evita inventar datos)\nconst REGLA = '\\n\\nREGLA: responde en espanol, basate SOLO en los datos del caso clinico y en lo dicho por tus colegas; si un dato no esta reportado (edad, antecedentes, estado hormonal, tamano por imagen, ganglios) di que no esta reportado, no lo inventes. Recuerda que BAG significa biopsia con aguja de corte (core), no aguja fina.';\nfor (const k of Object.keys(USR2)) USR2[k] += REGLA;\n\n// Construir bodies con historial completo: system > user(R1) > assistant(R1) > user(R2)\nconst bodies = {\n  body_radiologo:  JSON.stringify({ model: 'qwen3:14b',                    max_tokens: 2048, temperature: 0.4, think: false, messages: [{ role: 'system', content: SYS.radiologo  }, { role: 'user', content: USR1.radiologo  }, { role: 'assistant', content: r1r[0]?.respuesta ?? '' }, { role: 'user', content: USR2.radiologo  }] }),\n  body_cirujano:   JSON.stringify({ model: 'llama3.1:8b-local',             max_tokens: 1200, temperature: 0.4, messages: [{ role: 'system', content: SYS.cirujano   }, { role: 'user', content: USR1.cirujano   }, { role: 'assistant', content: r1r[1]?.respuesta ?? '' }, { role: 'user', content: USR2.cirujano   }] }),\n  body_oncologo:   JSON.stringify({ model: 'qwen3.5:9b-local',              max_tokens: 2048, temperature: 0.4, think: false, messages: [{ role: 'system', content: SYS.oncologo   }, { role: 'user', content: USR1.oncologo   }, { role: 'assistant', content: r1r[2]?.respuesta ?? '' }, { role: 'user', content: USR2.oncologo   }] }),\n  body_patologo:   JSON.stringify({ model: 'tomng/lfm2.5-instruct:latest', max_tokens: 1200, temperature: 0.4, messages: [{ role: 'system', content: SYS.patologo   }, { role: 'user', content: USR1.patologo   }, { role: 'assistant', content: r1r[3]?.respuesta ?? '' }, { role: 'user', content: USR2.patologo   }] }),\n  body_ginecologo: JSON.stringify({ model: 'llama3.2-local',                max_tokens: 1200, temperature: 0.4, messages: [{ role: 'system', content: SYS.ginecologo }, { role: 'user', content: USR1.ginecologo }, { role: 'assistant', content: r1r[4]?.respuesta ?? '' }, { role: 'user', content: USR2.ginecologo }] }),\n  body_radioterapeuta: JSON.stringify({ model: 'llama3.1:8b-local', max_tokens: 1200, temperature: 0.4, messages: [{ role: 'system', content: SYS.radioterapeuta }, { role: 'user', content: USR1.radioterapeuta }, { role: 'assistant', content: r1r[5]?.respuesta ?? '' }, { role: 'user', content: USR2.radioterapeuta }] })\n};\n\nreturn [{ json: { ...d, ...bodies } }];"
+      },
+      "id": "a4015836-15ea-418d-b690-91c54ffaf353",
+      "name": "Preparar Bodies R2",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        12928,
+        3168
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.litellm_url }}/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.litellm_key }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "body": "={{ $json.body_radiologo }}",
+        "options": {
+          "timeout": 1800000
+        },
+        "contentType": "raw",
+        "rawContentType": "application/json"
+      },
+      "id": "ebf951c3-4c04-46ed-bc39-0f3f970fe8b9",
+      "name": "R2 - Radiologa qwen3:14b",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        13104,
+        2848
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.litellm_url }}/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.litellm_key }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "body": "={{ $json.body_cirujano }}",
+        "options": {
+          "timeout": 1800000
+        },
+        "contentType": "raw",
+        "rawContentType": "application/json"
+      },
+      "id": "16bc0a21-98f1-403b-8bda-bb4b4539d5d0",
+      "name": "R2 - Cirujano llama3.1:8b",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        13104,
+        3008
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.litellm_url }}/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.litellm_key }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "body": "={{ $json.body_oncologo }}",
+        "options": {
+          "timeout": 1800000
+        },
+        "contentType": "raw",
+        "rawContentType": "application/json"
+      },
+      "id": "3216af0a-dad0-4e7c-91dd-2673860cf020",
+      "name": "R2 - Oncologa qwen3.5:9b",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        13104,
+        3168
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.litellm_url }}/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.litellm_key }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "body": "={{ $json.body_patologo }}",
+        "options": {
+          "timeout": 1800000
+        },
+        "contentType": "raw",
+        "rawContentType": "application/json"
+      },
+      "id": "3aa94d64-3aca-4d4d-8429-47ad771a004a",
+      "name": "R2 - Patologo lfm2.5-instruct",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        13104,
+        3328
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.litellm_url }}/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.litellm_key }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "body": "={{ $json.body_ginecologo }}",
+        "options": {
+          "timeout": 1800000
+        },
+        "contentType": "raw",
+        "rawContentType": "application/json"
+      },
+      "id": "9351849a-ba18-4080-98b9-3ad0a55d7aeb",
+      "name": "R2 - Ginecologa llama3.2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        13104,
+        3488
+      ]
+    },
+    {
+      "parameters": {
+        "numberInputs": 6
+      },
+      "id": "99a592b6-f6ae-41d9-996f-d7e935fba437",
+      "name": "Merge - Ronda 2",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        13312,
+        3168
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nconst especialistas = [\n  { nombre: 'Dra. Ana Valverde', rol: 'Radióloga Moderadora', modelo: 'qwen3:14b' },\n  { nombre: 'Dr. Carlos Mendoza', rol: 'Cirujano Oncólogo', modelo: 'llama3.1:8b-local' },\n  { nombre: 'Dra. Patricia Roldán', rol: 'Oncóloga Médica', modelo: 'qwen3.5:9b-local' },\n  { nombre: 'Dr. Rubén Castillo', rol: 'Patólogo', modelo: 'tomng/lfm2.5-instruct:latest' },\n  { nombre: 'Dra. Sofía Herrera', rol: 'Ginecóloga Mastóloga', modelo: 'llama3.2-local' },\n  { nombre: 'Dr. Andrés Navarro', rol: 'Oncólogo Radioterapeuta', modelo: 'llama3.1:8b-local' }\n];\n\nlet discusion_r2 = '=== RONDA 2: DEBATE Y CONTRAPOSICION ===\\n\\n';\nconst respuestas_r2 = [];\n\nfor (let i = 0; i < items.length; i++) {\n  const item = items[i];\n  const esp = especialistas[i] || { nombre: `Especialista ${i+1}`, rol: 'No definido', modelo: 'desconocido' };\n\n  let respuesta = item.json?.choices?.[0]?.message?.content ?? 'Sin respuesta del modelo.';\n\n  respuestas_r2.push({ especialista: esp.nombre, rol: esp.rol, modelo: esp.modelo, respuesta });\n  discusion_r2 += `--- ${esp.nombre} [${esp.modelo}] (${esp.rol}) ---\\n${respuesta}\\n\\n`;\n}\n\nconst r1 = $('Formatear Ronda 1').first().json;\n\nreturn [{\n  json: {\n    discusion_ronda1: r1.discusion_ronda1,\n    discusion_ronda2: discusion_r2,\n    respuestas_r2,\n    caso_clinico: r1.caso_clinico,\n    litellm_url: r1.litellm_url,\n    litellm_key: r1.litellm_key\n  }\n}];"
+      },
+      "id": "d34832c2-1d42-45a5-a054-654cc0f5850f",
+      "name": "Formatear Ronda 2",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        13520,
+        3168
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $input.first().json;\n\nconst userContent =\n  'SINTESIS FINAL DEL COMITE MULTIDISCIPLINARIO\\n\\n' +\n  'CASO CLINICO:\\n' + d.caso_clinico + '\\n\\n' +\n  d.discusion_ronda1 + '\\n\\n' +\n  d.discusion_ronda2 + '\\n\\n' +\n  'Emite el CONSENSO FINAL con el plan de acción para este BIRADS 4B. Estructura:\\n\\n' +\n  '1. RESUMEN EJECUTIVO (3-5 líneas)\\n' +\n  '2. PUNTOS DE CONSENSO DEL COMITE\\n' +\n  '3. PUNTOS DE DISCREPANCIA Y RESOLUCION\\n' +\n  '4. RECOMENDACIONES JERARQUIZADAS (numeradas por prioridad)\\n' +\n  '5. CAMINO CRITICO DE MANEJO (timeline secuencial)\\n' +\n  '6. CRITERIOS DE SEGUIMIENTO Y VIGILANCIA\\n' +\n  '7. NIVEL DE EVIDENCIA DE LAS RECOMENDACIONES\\n' +\n  '8. CONSIDERACIONES ETICAS Y DE CONSENTIMIENTO';\n\nconst body_sintesis = JSON.stringify({\n  model: 'qwen3:14b',\n  max_tokens: 4096,\n  temperature: 0.2,\n  frequency_penalty: 0.4,\n  think: false,\n  messages: [\n    {\n      role: 'system',\n      content: 'Eres un médico director de comité tumoral de mama con 25 años de experiencia coordinando comités multidisciplinarios en centros de excelencia oncológica. Tu función es sintetizar la discusión completa y emitir el CONSENSO FINAL con recomendaciones de acción. Debes: (1) identificar puntos de ACUERDO entre especialistas, (2) resolver puntos de DESACUERDO, (3) emitir recomendaciones JERARQUIZADAS basadas en evidencia, (4) definir el camino crítico de manejo, (5) establecer criterios de seguimiento. Referencia NCCN 2024, ESMO 2024, ACR Practice Parameters. El output debe ser claro, accionable y directamente útil para el médico tratante. REGLAS ESTRICTAS: responde SIEMPRE en español; NO incluyas firmas, listas de nombres ni secciones adicionales después de la sección 8; BAG significa biopsia con aguja de corte (core), no aguja fina; no cites edad, estudios de imagen ni antecedentes que no estén en el caso clínico; sigue EXACTAMENTE las 8 secciones numeradas que se te piden; basa la síntesis únicamente en el caso clínico y en lo que dijeron los especialistas, sin inventar datos no reportados (si falta un dato, dilo); si algún especialista no aportó respuesta o su respuesta es incoherente con el caso, indícalo y no la uses; refleja el hallazgo concreto del caso (histología reportada, ausencia de atipia, necesidad de correlación radiológico-patológica) y no des un resumen genérico de BIRADS 4B.'\n    },\n    {\n      role: 'user',\n      content: userContent\n    }\n  ]\n});\n\nreturn [{ json: { ...d, body_sintesis } }];"
+      },
+      "id": "1f9c38a1-041a-40f7-8199-771db8f72ba0",
+      "name": "Preparar Body Sintesis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        13648,
+        3168
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.litellm_url }}/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.litellm_key }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "body": "={{ $json.body_sintesis }}",
+        "options": {
+          "timeout": 1800000
+        },
+        "contentType": "raw",
+        "rawContentType": "application/json"
+      },
+      "id": "42726eb1-d69b-49eb-a040-1b422f459710",
+      "name": "Sintesis Final qwen3:14b",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        13824,
+        3120
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const sintesisItem = $input.first();\nconst r2 = $('Formatear Ronda 2').first().json;\n\nfunction sinRepeticiones(t) {\n  const out = []; let prev = null, rep = 0;\n  for (const l of t.split('\\n')) {\n    if (l.trim() && l === prev) { if (++rep >= 2) continue; } else { rep = 0; }\n    prev = l; out.push(l);\n  }\n  return out.join('\\n');\n}\nlet consenso = 'Sin consenso generado.';\nif (sintesisItem.json?.choices?.[0]?.message?.content) {\n  consenso = sinRepeticiones(sintesisItem.json.choices[0].message.content);\n} else if (sintesisItem.json?.error) {\n  consenso = `ERROR en síntesis: ${JSON.stringify(sintesisItem.json.error)}`;\n}\n\nconst modelosUsados = {\n  prevalidacion:  'gemma3:270m',\n  radiologo:      'qwen3:14b',\n  cirujano:       'llama3.1:8b-local',\n  oncologo:       'qwen3.5:9b-local',\n  patologo:       'tomng/lfm2.5-instruct:latest',\n  ginecologo:     'llama3.2-local',\n  radioterapeuta: 'llama3.1:8b-local',\n  sintesis_final: 'qwen3:14b'\n};\n\nconst reporte = {\n  titulo: 'REPORTE DE COMITE MULTIDISCIPLINARIO - BIRADS 4B',\n  fecha: new Date().toISOString(),\n  backend: 'LiteLLM Local',\n  caso_clinico: r2.caso_clinico,\n  especialistas: [\n    `Dra. Ana Valverde - Radióloga de Mama (${modelosUsados.radiologo})`,\n    `Dr. Carlos Mendoza - Cirujano Oncólogo (${modelosUsados.cirujano})`,\n    `Dra. Patricia Roldán - Oncóloga Médica (${modelosUsados.oncologo})`,\n    `Dr. Rubén Castillo - Patólogo Especialista (${modelosUsados.patologo})`,\n    `Dra. Sofía Herrera - Ginecóloga Mastóloga (${modelosUsados.ginecologo})`,\n    `Dr. Andrés Navarro - Oncólogo Radioterapeuta (${modelosUsados.radioterapeuta})`\n  ],\n  modelos_ia: modelosUsados,\n  rondas_completadas: 2,\n  discusion_completa: {\n    ronda_1: r2.discusion_ronda1,\n    ronda_2: r2.discusion_ronda2\n  },\n  consenso_final: consenso,\n  disclaimer: 'Reporte generado por agentes de IA local (LiteLLM + Ollama). No reemplaza el juicio médico profesional. Debe ser revisado y validado por médicos especialistas certificados antes de su aplicación clínica.'\n};\n\nconst reporte_texto = `\n${'='.repeat(65)}\n${reporte.titulo}\n${'='.repeat(65)}\nFecha     : ${reporte.fecha}\nBackend   : ${reporte.backend} (${r2.litellm_url})\nSíntesis  : ${modelosUsados.sintesis_final}\n\nCASO CLINICO:\n${reporte.caso_clinico}\n\nESPECIALISTAS PARTICIPANTES:\n${reporte.especialistas.map((e,i) => `${i+1}. ${e}`).join('\\n')}\n\n${reporte.discusion_completa.ronda_1}\n\n${reporte.discusion_completa.ronda_2}\n\n${'='.repeat(65)}\nCONSENSO FINAL DEL COMITE  [${modelosUsados.sintesis_final}]\n${'='.repeat(65)}\n${reporte.consenso_final}\n\n${'='.repeat(65)}\nDISCLAIMER: ${reporte.disclaimer}\n${'='.repeat(65)}\n`;\n\nreturn [{ json: { reporte, reporte_texto } }];"
+      },
+      "id": "5492f42d-4e2d-4272-bf20-32672d9f61ef",
+      "name": "Generar Reporte Final",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        14000,
+        3168
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.reporte, null, 2) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "e9a9ab0c-0dc8-4af1-8856-a937c3beb707",
+      "name": "Respuesta Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        14224,
+        3168
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.litellm_url }}/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.litellm_key }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama3.1:8b-local\",\n  \"max_tokens\": 1024,\n  \"temperature\": 0.3,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Eres el Dr. Andrés Navarro, oncólogo radioterapeuta con 17 años de experiencia en radioterapia de cáncer de mama (hipofraccionamiento, boost, irradiación parcial acelerada, irradiación ganglionar). Evalúa: (1) si la lesión, de confirmarse malignidad, tendría probable indicación de radioterapia (conservadora vs post-mastectomía), (2) factores que modifican esa indicación (tamaño, márgenes, ganglios, edad, subtipo), (3) contraindicaciones o consideraciones previas a RT (antecedentes, colagenopatías, cardiopatía, radiación previa), (4) secuencia óptima con cirugía y tratamiento sistémico, (5) si el escenario es benigno o de riesgo, cuándo NO se requiere RT. Estructura: INDICACION PROBABLE DE RT / FACTORES MODIFICADORES / CONTRAINDICACIONES Y RIESGOS / SECUENCIA CON CIRUGIA Y SISTEMICO / ESCENARIO BENIGNO O DE RIESGO.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"RONDA 1 - VALORACION INICIAL\\n\\nCaso clínico: {{ $json.caso_clinico }}\\n\\nComo oncólogo radioterapeuta, da tu valoración inicial sobre la eventual necesidad y planeación de radioterapia en este BIRADS 4B.\"\n    }\n  ]\n}",
+        "options": {
+          "timeout": 1800000
+        }
+      },
+      "id": "71de9639-9ddd-4be1-baa5-74cc6debc7b6",
+      "name": "R1 - Radioterapeuta llama3.1:8b",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        12320,
+        3648
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.litellm_url }}/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.litellm_key }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "body": "={{ $json.body_radioterapeuta }}",
+        "options": {
+          "timeout": 1800000
+        },
+        "contentType": "raw",
+        "rawContentType": "application/json"
+      },
+      "id": "45987d9b-d4c4-4e29-8265-31d80c722bd0",
+      "name": "R2 - Radioterapeuta llama3.1:8b",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        13104,
+        3648
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - Caso Clinico": {
+      "main": [
+        [
+          {
+            "node": "Configurar Caso Clinico",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configurar Caso Clinico": {
+      "main": [
+        [
+          {
+            "node": "Pre-Validación Caso (gemma3:270m)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pre-Validación Caso (gemma3:270m)": {
+      "main": [
+        [
+          {
+            "node": "Verificar Validación",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar Validación": {
+      "main": [
+        [
+          {
+            "node": "R1 - Radióloga qwen3:14b",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "R1 - Cirujano llama3.1:8b",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "R1 - Oncóloga qwen3.5:9b",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "R1 - Patólogo lfm2.5-instruct",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "R1 - Ginecóloga llama3.2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "R1 - Radioterapeuta llama3.1:8b",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "R1 - Radióloga qwen3:14b": {
+      "main": [
+        [
+          {
+            "node": "Merge - Ronda 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "R1 - Cirujano llama3.1:8b": {
+      "main": [
+        [
+          {
+            "node": "Merge - Ronda 1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "R1 - Oncóloga qwen3.5:9b": {
+      "main": [
+        [
+          {
+            "node": "Merge - Ronda 1",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "R1 - Patólogo lfm2.5-instruct": {
+      "main": [
+        [
+          {
+            "node": "Merge - Ronda 1",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "R1 - Ginecóloga llama3.2": {
+      "main": [
+        [
+          {
+            "node": "Merge - Ronda 1",
+            "type": "main",
+            "index": 4
+          }
+        ]
+      ]
+    },
+    "Merge - Ronda 1": {
+      "main": [
+        [
+          {
+            "node": "Formatear Ronda 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatear Ronda 1": {
+      "main": [
+        [
+          {
+            "node": "Preparar Bodies R2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Bodies R2": {
+      "main": [
+        [
+          {
+            "node": "R2 - Radiologa qwen3:14b",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "R2 - Cirujano llama3.1:8b",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "R2 - Oncologa qwen3.5:9b",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "R2 - Patologo lfm2.5-instruct",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "R2 - Ginecologa llama3.2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "R2 - Radioterapeuta llama3.1:8b",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "R2 - Radiologa qwen3:14b": {
+      "main": [
+        [
+          {
+            "node": "Merge - Ronda 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "R2 - Cirujano llama3.1:8b": {
+      "main": [
+        [
+          {
+            "node": "Merge - Ronda 2",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "R2 - Oncologa qwen3.5:9b": {
+      "main": [
+        [
+          {
+            "node": "Merge - Ronda 2",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "R2 - Patologo lfm2.5-instruct": {
+      "main": [
+        [
+          {
+            "node": "Merge - Ronda 2",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "R2 - Ginecologa llama3.2": {
+      "main": [
+        [
+          {
+            "node": "Merge - Ronda 2",
+            "type": "main",
+            "index": 4
+          }
+        ]
+      ]
+    },
+    "Merge - Ronda 2": {
+      "main": [
+        [
+          {
+            "node": "Formatear Ronda 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatear Ronda 2": {
+      "main": [
+        [
+          {
+            "node": "Preparar Body Sintesis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Body Sintesis": {
+      "main": [
+        [
+          {
+            "node": "Sintesis Final qwen3:14b",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generar Reporte Final": {
+      "main": [
+        [
+          {
+            "node": "Respuesta Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "R1 - Radioterapeuta llama3.1:8b": {
+      "main": [
+        [
+          {
+            "node": "Merge - Ronda 1",
+            "type": "main",
+            "index": 5
+          }
+        ]
+      ]
+    },
+    "R2 - Radioterapeuta llama3.1:8b": {
+      "main": [
+        [
+          {
+            "node": "Merge - Ronda 2",
+            "type": "main",
+            "index": 5
+          }
+        ]
+      ]
+    },
+    "Sintesis Final qwen3:14b": {
+      "main": [
+        [
+          {
+            "node": "Generar Reporte Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "70fceabd-dad1-4284-b07d-7d31a14ccbe2",
+  "meta": {
+    "instanceId": "d875ae845499579163d494e2ac7c7af243f9e8569169057b531543fe51f549c7"
+  },
+  "id": "5GfZMChnzMznWhY2",
+  "tags": []
+}

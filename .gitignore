@@ -3,3 +3,7 @@
 
 # Backups
 *.bk
+
+# Secretos locales
+.env
+reportes/
